@@ -60,9 +60,10 @@ final class PanelPresenter {
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
             self?.dismiss()
         }) { monitors.append(global) }
-        // Clicks on the bar are left alone: its buttons toggle popups themselves.
+        // Clicks on the bar are left alone: its buttons toggle popups themselves. A click in another ProperBar window
+        // (Settings) must keep ProperBar active, or re-activating the previous app would bury the window just clicked.
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] event in
-            if let self, let window = event.window, window !== self.panel, !(window is BarPanel) { self.dismiss() }
+            if let self, let window = event.window, window !== self.panel, !(window is BarPanel) { self.dismiss(restoreFocus: false) }
             return event
         }) { monitors.append(local) }
     }
