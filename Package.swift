@@ -6,6 +6,11 @@ let package = Package(
     platforms: [.macOS(.v15)],
     targets: [
         .target(name: "ProperBarCore"),
+        .executableTarget(
+            name: "ProperBar",
+            dependencies: ["ProperBarCore"],
+            linkerSettings: [.linkedFramework("CoreWLAN"), .linkedFramework("ScreenCaptureKit")]
+        ),
         .testTarget(name: "ProperBarCoreTests", dependencies: ["ProperBarCore"]),
     ],
     swiftLanguageModes: [.v5]
