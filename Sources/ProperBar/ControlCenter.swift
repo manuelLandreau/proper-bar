@@ -24,7 +24,7 @@ struct TrayView: View {
         .padding(.horizontal, horizontal ? 10 : 0)
         .padding(.vertical, horizontal ? 0 : 10)
         .frame(maxWidth: horizontal ? nil : .infinity, maxHeight: horizontal ? .infinity : nil)
-        .hoverHighlight()
+        .hoverHighlight(radius: CGFloat(prefs.tileRadius), enabled: prefs.hoverHighlight)
         .globalFrame($frame)
         .onTapGesture(perform: open)
         .onReceive(NotificationCenter.default.publisher(for: .demoPanel)) { note in

@@ -76,6 +76,50 @@ enum Theme: String, Codable, CaseIterable {
     }
 }
 
+enum IndicatorStyle: String, Codable, CaseIterable {
+    case pill, line, dot, none
+    var label: String {
+        switch self {
+        case .pill: "Pilule"
+        case .line: "Ligne (KDE Plasma)"
+        case .dot: "Point"
+        case .none: "Aucun"
+        }
+    }
+}
+
+struct TileLook: Equatable {
+    var indicator: IndicatorStyle
+    var thickness: Double
+    var length: Double
+    var atEdge: Bool
+    var radius: Double
+    var hoverZoom: Bool
+    var hoverHighlight: Bool
+}
+
+enum TileStyle: CaseIterable {
+    case macOS, plasma, dots, custom
+
+    var label: String {
+        switch self {
+        case .macOS: "macOS"
+        case .plasma: "KDE Plasma"
+        case .dots: "Points (Dock)"
+        case .custom: "Personnalisé"
+        }
+    }
+
+    var look: TileLook? {
+        switch self {
+        case .macOS: TileLook(indicator: .pill, thickness: 3, length: 0.4, atEdge: true, radius: 7, hoverZoom: true, hoverHighlight: true)
+        case .plasma: TileLook(indicator: .line, thickness: 3, length: 1, atEdge: true, radius: 3, hoverZoom: false, hoverHighlight: true)
+        case .dots: TileLook(indicator: .dot, thickness: 4, length: 0.4, atEdge: true, radius: 7, hoverZoom: true, hoverHighlight: false)
+        case .custom: nil
+        }
+    }
+}
+
 extension Grouping {
     var label: String {
         switch self {
@@ -112,6 +156,14 @@ final class Prefs: ObservableObject {
     @Published var launcherFollowsIconSize = load("launcherFollowsIconSize", true) {
         didSet { store("launcherFollowsIconSize", launcherFollowsIconSize) }
     }
+    @Published var maxTileWidth = load("maxTileWidth", 232.0) { didSet { store("maxTileWidth", maxTileWidth) } }
+    @Published var indicatorStyle = load("indicatorStyle", IndicatorStyle.pill) { didSet { store("indicatorStyle", indicatorStyle) } }
+    @Published var indicatorThickness = load("indicatorThickness", 3.0) { didSet { store("indicatorThickness", indicatorThickness) } }
+    @Published var indicatorLength = load("indicatorLength", 0.4) { didSet { store("indicatorLength", indicatorLength) } }
+    @Published var indicatorAtEdge = load("indicatorAtEdge", true) { didSet { store("indicatorAtEdge", indicatorAtEdge) } }
+    @Published var tileRadius = load("tileRadius", 7.0) { didSet { store("tileRadius", tileRadius) } }
+    @Published var hoverZoom = load("hoverZoom", true) { didSet { store("hoverZoom", hoverZoom) } }
+    @Published var hoverHighlight = load("hoverHighlight", true) { didSet { store("hoverHighlight", hoverHighlight) } }
     @Published var autoHide = load("autoHide", false) { didSet { store("autoHide", autoHide) } }
     @Published var keepWindowsClear = load("keepWindowsClear", true) { didSet { store("keepWindowsClear", keepWindowsClear) } }
     @Published var screenMode = load("screenMode", ScreenMode.perScreen) { didSet { store("screenMode", screenMode) } }
@@ -132,6 +184,25 @@ final class Prefs: ObservableObject {
     @Published var manualOrder = load("manualOrder", [String]()) { didSet { store("manualOrder", manualOrder) } }
     @Published var favorites = load("favorites", [String]()) { didSet { store("favorites", favorites) } }
     @Published var startFolders = load("startFolders", [String]()) { didSet { store("startFolders", startFolders) } }
+
+    var tileStyle: TileStyle {
+        get { TileStyle.allCases.first { $0.look == tileLook } ?? .custom }
+        set {
+            guard let look = newValue.look else { return }
+            indicatorStyle = look.indicator
+            indicatorThickness = look.thickness
+            indicatorLength = look.length
+            indicatorAtEdge = look.atEdge
+            tileRadius = look.radius
+            hoverZoom = look.hoverZoom
+            hoverHighlight = look.hoverHighlight
+        }
+    }
+
+    private var tileLook: TileLook {
+        TileLook(indicator: indicatorStyle, thickness: indicatorThickness, length: indicatorLength, atEdge: indicatorAtEdge,
+                 radius: tileRadius, hoverZoom: hoverZoom, hoverHighlight: hoverHighlight)
+    }
 
     var iconSide: CGFloat { min(CGFloat(iconSize), size.thickness - 8) }
     var launcherIconSide: CGFloat { launcherFollowsIconSize ? iconSide : size.icon }

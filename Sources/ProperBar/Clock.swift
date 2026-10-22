@@ -22,7 +22,7 @@ struct ClockView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .frame(maxWidth: horizontal ? nil : .infinity, maxHeight: horizontal ? .infinity : nil)
-        .hoverHighlight()
+        .hoverHighlight(radius: CGFloat(prefs.tileRadius), enabled: prefs.hoverHighlight)
         .globalFrame($frame)
         .onTapGesture(perform: open)
         .onReceive(NotificationCenter.default.publisher(for: .demoPanel)) { note in

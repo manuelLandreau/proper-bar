@@ -101,10 +101,33 @@ struct SettingsView: View {
                 picker("Mode", $prefs.mode, BarMode.allCases, \.label)
                 picker("Position", $prefs.position, BarPosition.allCases, \.label)
                 picker("Hauteur de la barre", $prefs.size, BarSize.allCases, \.label)
+                Toggle("Masquer automatiquement", isOn: $prefs.autoHide)
+            }
+
+            Section("Tuiles") {
+                Picker("Style", selection: Binding(get: { prefs.tileStyle }, set: { prefs.tileStyle = $0 })) {
+                    ForEach(TileStyle.allCases, id: \.self) { Text($0.label).tag($0) }
+                }
                 slider("Taille des icônes", $prefs.iconSize, 14...48)
                 slider("Marge autour des icônes", $prefs.tilePadding, 0...20)
                 slider("Espacement entre les tuiles", $prefs.tileSpacing, 0...16)
-                Toggle("Masquer automatiquement", isOn: $prefs.autoHide)
+                if prefs.mode == .taskbar {
+                    slider("Largeur maximale des tuiles", $prefs.maxTileWidth, 132...360)
+                }
+                Toggle("Surligner au survol", isOn: $prefs.hoverHighlight)
+                Toggle("Agrandir l'icône au survol", isOn: $prefs.hoverZoom)
+                    .disabled(prefs.mode != .dock)
+                DisclosureGroup("Indicateur et forme") {
+                    picker("Indicateur", $prefs.indicatorStyle, IndicatorStyle.allCases, \.label)
+                    if prefs.indicatorStyle != .none {
+                        slider("Épaisseur", $prefs.indicatorThickness, 1...8)
+                        if prefs.indicatorStyle != .dot {
+                            slider("Longueur", $prefs.indicatorLength, 0.1...1, unit: "%", scale: 100, step: 0.05)
+                        }
+                        Toggle("Côté bord de l'écran", isOn: $prefs.indicatorAtEdge)
+                    }
+                    slider("Arrondi des tuiles", $prefs.tileRadius, 0...14)
+                }
             }
 
             Section("Lanceur") {
@@ -194,11 +217,13 @@ struct SettingsView: View {
         prefs.launcherImagePath = url.path
     }
 
-    private func slider(_ title: String, _ value: Binding<Double>, _ range: ClosedRange<Double>) -> some View {
+    private func slider(_ title: String, _ value: Binding<Double>, _ range: ClosedRange<Double>,
+                        unit: String = "pt", scale: Double = 1, step: Double = 1) -> some View {
         LabeledContent(title) {
             HStack {
-                Slider(value: value, in: range, step: 1).frame(width: 160)
-                Text("\(Int(value.wrappedValue)) pt").monospacedDigit().foregroundStyle(.secondary).frame(width: 40, alignment: .trailing)
+                Slider(value: value, in: range, step: step).frame(width: 160)
+                Text("\(Int((value.wrappedValue * scale).rounded())) \(unit)")
+                    .monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing)
             }
         }
     }

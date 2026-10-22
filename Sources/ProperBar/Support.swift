@@ -127,12 +127,13 @@ struct GlobalFrameReader: ViewModifier {
 struct HoverHighlight: ViewModifier {
     var active = false
     var radius: CGFloat = 7
+    var enabled = true
     @State private var hovering = false
 
     func body(content: Content) -> some View {
         content
             .background(RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(Color.primary.opacity(active ? 0.14 : hovering ? 0.08 : 0)))
+                .fill(Color.primary.opacity(active ? 0.14 : hovering && enabled ? 0.08 : 0)))
             .contentShape(Rectangle())
             .onHover { hovering = $0 }
             .animation(Motion.hover, value: hovering)
@@ -142,7 +143,9 @@ struct HoverHighlight: ViewModifier {
 
 extension View {
     func globalFrame(_ frame: Binding<CGRect>) -> some View { modifier(GlobalFrameReader(frame: frame)) }
-    func hoverHighlight(active: Bool = false, radius: CGFloat = 7) -> some View { modifier(HoverHighlight(active: active, radius: radius)) }
+    func hoverHighlight(active: Bool = false, radius: CGFloat = 7, enabled: Bool = true) -> some View {
+        modifier(HoverHighlight(active: active, radius: radius, enabled: enabled))
+    }
 }
 
 func popupFrame(size: CGSize, anchor: CGRect, gap: CGFloat = 8) -> CGRect {

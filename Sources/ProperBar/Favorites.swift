@@ -34,7 +34,7 @@ struct FavoriteItem: View {
             .interpolation(.high)
             .frame(width: prefs.iconSide, height: prefs.iconSide)
             .frame(width: side, height: side)
-            .hoverHighlight()
+            .hoverHighlight(radius: CGFloat(prefs.tileRadius), enabled: prefs.hoverHighlight)
             .onTapGesture(perform: open)
             .contextMenu {
                 Button("Ouvrir") { NSWorkspace.shared.open(URL(fileURLWithPath: path)) }

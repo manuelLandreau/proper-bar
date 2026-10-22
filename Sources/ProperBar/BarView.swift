@@ -59,7 +59,7 @@ struct StartButton: View {
             }
         }
         .frame(width: side, height: prefs.size.thickness - 8)
-        .hoverHighlight()
+        .hoverHighlight(radius: CGFloat(prefs.tileRadius), enabled: prefs.hoverHighlight)
         .globalFrame($frame)
         .onTapGesture(perform: open)
         .onReceive(NotificationCenter.default.publisher(for: .demoPanel)) { note in
@@ -96,7 +96,7 @@ struct TilesView: View {
             let tiles = makeTiles(apps: apps, pinned: prefs.pinned, grouping: taskbar ? prefs.grouping : .always,
                                   order: prefs.order, manualOrder: prefs.manualOrder, capacity: capacity)
             let fitted = horizontal && taskbar
-                ? min(232, max(minLength, (length + spacing) / CGFloat(max(tiles.count, 1)) - spacing))
+                ? min(max(CGFloat(prefs.maxTileWidth), minLength), max(minLength, (length + spacing) / CGFloat(max(tiles.count, 1)) - spacing))
                 : minLength
             let stack = horizontal ? AnyLayout(HStackLayout(spacing: spacing)) : AnyLayout(VStackLayout(spacing: spacing))
             ScrollView(horizontal ? .horizontal : .vertical) {
@@ -131,8 +131,12 @@ struct TileView: View {
     var body: some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: prefs.mode == .taskbar ? .leading : .center)
-            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(fill))
-            .overlay(alignment: indicatorAlignment) { indicator }
+            .background(RoundedRectangle(cornerRadius: CGFloat(prefs.tileRadius), style: .continuous).fill(fill))
+            .overlay {
+                if tile.isRunning && prefs.indicatorStyle != .none {
+                    TileIndicator(isActive: tile.isActive, hovering: hovering)
+                }
+            }
             .contentShape(Rectangle())
             .opacity(tile.isLaunching ? 0.5 : 1)
             .animation(Motion.hover, value: hovering)
@@ -191,7 +195,7 @@ struct TileView: View {
             .resizable()
             .interpolation(.high)
             .frame(width: prefs.iconSide, height: prefs.iconSide)
-            .scaleEffect(hovering && prefs.mode == .dock ? 1.1 : 1)
+            .scaleEffect(hovering && prefs.mode == .dock && prefs.hoverZoom ? 1.1 : 1)
             .overlay(alignment: .topTrailing) {
                 if let badge { BadgeView(text: badge).offset(x: 7, y: -5) }
             }
@@ -210,27 +214,61 @@ struct TileView: View {
 
     private var fill: Color {
         if dropping { return Color.accentColor.opacity(0.35) }
-        if tile.isActive { return Color.primary.opacity(hovering ? 0.18 : 0.13) }
-        return Color.primary.opacity(hovering ? 0.08 : 0)
+        let hover = hovering && prefs.hoverHighlight
+        if tile.isActive { return Color.primary.opacity(hover ? 0.18 : 0.13) }
+        return Color.primary.opacity(hover ? 0.08 : 0)
+    }
+}
+
+struct TileIndicator: View {
+    let isActive: Bool
+    let hovering: Bool
+    @ObservedObject private var prefs = Prefs.shared
+
+    var body: some View {
+        GeometryReader { geo in
+            let horizontal = prefs.position.isHorizontal
+            let cell = horizontal ? geo.size.width : geo.size.height
+            let thickness = CGFloat(prefs.indicatorThickness)
+            let along = length(cell: cell, thickness: thickness)
+            let across = prefs.indicatorStyle == .dot ? along : thickness
+            shape
+                .fill(color)
+                .frame(width: horizontal ? along : across, height: horizontal ? across : along)
+                .padding(prefs.indicatorStyle == .line ? 0 : 1)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: alignment)
+        }
+        .allowsHitTesting(false)
+        .animation(Motion.state, value: isActive)
     }
 
-    private var indicatorAlignment: Alignment {
-        switch prefs.position {
-        case .bottom: .bottom
-        case .top: .top
-        case .left: .leading
-        case .right: .trailing
+    private func length(cell: CGFloat, thickness: CGFloat) -> CGFloat {
+        let fraction = CGFloat(prefs.indicatorLength)
+        switch prefs.indicatorStyle {
+        case .pill: return isActive ? max(thickness * 2, cell * fraction) : max(thickness * 1.7, cell * fraction * 0.3)
+        case .line: return cell * fraction
+        case .dot: return thickness * 1.6
+        case .none: return 0
         }
     }
 
-    @ViewBuilder private var indicator: some View {
-        if tile.isRunning {
-            let horizontal = prefs.position.isHorizontal
-            let long: CGFloat = tile.isActive ? 16 : 5
-            Capsule()
-                .fill(tile.isActive ? Color.accentColor : Color.primary.opacity(0.4))
-                .frame(width: horizontal ? long : 3, height: horizontal ? 3 : long)
-                .padding(1)
+    private var shape: AnyShape {
+        prefs.indicatorStyle == .line ? AnyShape(Rectangle()) : AnyShape(Capsule())
+    }
+
+    private var color: Color {
+        if isActive { return .accentColor }
+        if prefs.indicatorStyle == .line { return Color.primary.opacity(hovering ? 0.55 : 0.3) }
+        return Color.primary.opacity(0.4)
+    }
+
+    private var alignment: Alignment {
+        let edge = prefs.indicatorAtEdge
+        switch prefs.position {
+        case .bottom: return edge ? .bottom : .top
+        case .top: return edge ? .top : .bottom
+        case .left: return edge ? .leading : .trailing
+        case .right: return edge ? .trailing : .leading
         }
     }
 }

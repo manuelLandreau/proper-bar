@@ -50,6 +50,9 @@ enum Demo {
         prefs.manualOrder = prefs.pinned.map(\.id)
         prefs.favorites = ["/Applications", NSHomeDirectory() + "/Documents"]
         if let mode = value("--demo-mode").flatMap(BarMode.init(rawValue:)) { prefs.mode = mode }
+        if let style = value("--demo-style"), let match = TileStyle.allCases.first(where: { "\($0)" == style }) {
+            prefs.tileStyle = match
+        }
     }
 
     private static var backdrop: NSWindow?
