@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleAllowMixedLocalizations</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>fr</string>
+	<key>CFBundleDisplayName</key>
+	<string>ProperBar</string>
+	<key>CFBundleExecutable</key>
+	<string>ProperBar</string>
+	<key>CFBundleIdentifier</key>
+	<string>fr.manuellandreau.properbar</string>
+	<key>CFBundleName</key>
+	<string>ProperBar</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>ProperBar envoie les commandes Redémarrer, Éteindre et Fermer la session, et bascule le mode sombre.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>ProperBar affiche et bascule l'état du Bluetooth.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+</dict>
+</plist>
