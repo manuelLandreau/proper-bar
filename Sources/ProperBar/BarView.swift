@@ -372,19 +372,19 @@ enum TileActions {
         _ = provider.loadObject(ofClass: NSString.self) { object, _ in
             guard let text = object as? String, text.hasPrefix(dragPrefix) else { return }
             let id = String(text.dropFirst(dragPrefix.count))
-            DispatchQueue.main.async { move(id, before: tile.appID, siblings: siblings) }
+            DispatchQueue.main.async { move(id, onto: tile.appID, siblings: siblings) }
         }
         return true
     }
 
-    static func move(_ id: String, before target: String, siblings: [Tile]) {
-        guard id != target else { return }
+    static func move(_ id: String, onto target: String, siblings: [Tile]) {
         var ids: [String] = []
         for tile in siblings where !ids.contains(tile.appID) { ids.append(tile.appID) }
-        ids.removeAll { $0 == id }
-        ids.insert(id, at: ids.firstIndex(of: target) ?? ids.endIndex)
+        let order = reordered(ids, moving: id, onto: target)
+        guard order != ids else { return }
         let prefs = Prefs.shared
-        prefs.manualOrder = ids + prefs.manualOrder.filter { !ids.contains($0) }
+        prefs.manualOrder = order + prefs.manualOrder.filter { !order.contains($0) }
+        prefs.pinned.sort { (order.firstIndex(of: $0.id) ?? .max) < (order.firstIndex(of: $1.id) ?? .max) }
         prefs.order = .manual
     }
 }

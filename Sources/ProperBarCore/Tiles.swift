@@ -184,3 +184,12 @@ private func sort(_ entries: [Entry], order: AppOrder, manualOrder: [String]) ->
     }
     return sorted.map(\.element)
 }
+
+/// Drag-to-reorder semantics: the dragged item takes the target's slot and everything between shifts by one.
+public func reordered(_ ids: [String], moving id: String, onto target: String) -> [String] {
+    guard id != target, let from = ids.firstIndex(of: id), let to = ids.firstIndex(of: target) else { return ids }
+    var result = ids
+    result.remove(at: from)
+    result.insert(id, at: to)
+    return result
+}

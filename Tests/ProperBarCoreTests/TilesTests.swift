@@ -74,3 +74,16 @@ private func tiles(_ apps: [AppItem], pinned: [PinnedApp] = [], grouping: Groupi
     #expect(tiles(apps, grouping: .always) == ["a:term"])
     #expect(tiles(apps) == ["w:3", "w:5"])
 }
+
+@Test func draggingRightTakesTheTargetSlot() {
+    #expect(reordered(["a", "b", "c", "d"], moving: "a", onto: "c") == ["b", "c", "a", "d"])
+}
+
+@Test func draggingLeftTakesTheTargetSlot() {
+    #expect(reordered(["a", "b", "c", "d"], moving: "d", onto: "b") == ["a", "d", "b", "c"])
+}
+
+@Test func reorderingOntoItselfOrAnUnknownIdChangesNothing() {
+    #expect(reordered(["a", "b"], moving: "a", onto: "a") == ["a", "b"])
+    #expect(reordered(["a", "b"], moving: "z", onto: "a") == ["a", "b"])
+}
