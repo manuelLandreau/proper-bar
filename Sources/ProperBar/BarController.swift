@@ -27,7 +27,7 @@ final class BarController {
     init(screen: NSScreen, showsAllWindows: Bool) {
         self.screen = screen
         panel = BarPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)))
+        panel.level = .bar
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
         panel.isOpaque = false
         panel.backgroundColor = .clear

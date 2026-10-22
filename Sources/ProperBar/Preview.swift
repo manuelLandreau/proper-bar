@@ -22,7 +22,7 @@ final class PreviewController: ObservableObject {
 
     init() {
         panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        panel.level = .popUpMenu
+        panel.level = .aboveBar
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true

@@ -8,6 +8,12 @@ extension NSScreen {
     }
 }
 
+extension NSWindow.Level {
+    static let bar = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)))
+    // Above the bar, below .popUpMenu: context menus opened over a preview or a popup must stay on top of it.
+    static let aboveBar = NSWindow.Level(rawValue: bar.rawValue + 1)
+}
+
 extension CGRect {
     var area: CGFloat { isNull ? 0 : width * height }
 }

@@ -30,7 +30,7 @@ final class PanelPresenter {
         let panel = PopupPanel(contentRect: CGRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel],
                                backing: .buffered, defer: false)
         panel.acceptsKey = key
-        panel.level = .popUpMenu
+        panel.level = .aboveBar
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
