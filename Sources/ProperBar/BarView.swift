@@ -13,15 +13,19 @@ struct BarView: View {
         let horizontal = prefs.position.isHorizontal
         let spacing = CGFloat(prefs.tileSpacing)
         let stack = horizontal ? AnyLayout(HStackLayout(spacing: spacing)) : AnyLayout(VStackLayout(spacing: spacing))
-        stack {
-            StartButton()
-            if prefs.showFavorites && !prefs.favorites.isEmpty { FavoritesView() }
-            TilesView(apps: visibleApps)
-            if prefs.showTray { TrayView() }
-            if prefs.showClock { ClockView() }
+        let edge = horizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+        edge {
+            stack {
+                StartButton()
+                if prefs.showFavorites && !prefs.favorites.isEmpty { FavoritesView() }
+                TilesView(apps: visibleApps)
+                if prefs.showTray { TrayView() }
+                if prefs.showClock { ClockView() }
+            }
+            .padding(.horizontal, horizontal ? 6 : 4)
+            .padding(.vertical, horizontal ? 4 : 6)
+            if prefs.showDesktopEdge { ShowDesktopEdge() }
         }
-        .padding(.horizontal, horizontal ? 6 : 4)
-        .padding(.vertical, horizontal ? 4 : 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -386,5 +390,38 @@ enum TileActions {
         prefs.manualOrder = order + prefs.manualOrder.filter { !order.contains($0) }
         prefs.pinned.sort { (order.firstIndex(of: $0.id) ?? .max) < (order.firstIndex(of: $1.id) ?? .max) }
         prefs.order = .manual
+    }
+}
+
+// Sits outside the bar padding so it reaches the screen corner, like the Windows "show desktop" sliver.
+struct ShowDesktopEdge: View {
+    @ObservedObject private var prefs = Prefs.shared
+    @State private var hovering = false
+
+    var body: some View {
+        let horizontal = prefs.position.isHorizontal
+        Rectangle()
+            .fill(Color.primary.opacity(hovering ? 0.12 : 0))
+            .frame(width: horizontal ? 8 : nil, height: horizontal ? nil : 8)
+            .contentShape(Rectangle())
+            .animation(Motion.hover, value: hovering)
+            .onHover { hovering = $0 }
+            .onTapGesture { Desktop.toggle() }
+            .help("Afficher le bureau")
+    }
+}
+
+// Private Dock call: NSRunningApplication.hide() is refused on the frontmost app when another process asks.
+enum Desktop {
+    private typealias SendNotification = @convention(c) (CFString, Int32) -> Void
+    private static let send: SendNotification? = {
+        let handle = dlopen("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", RTLD_LAZY)
+        return dlsym(handle, "CoreDockSendNotification").map { unsafeBitCast($0, to: SendNotification.self) }
+    }()
+
+    static func toggle() {
+        PanelPresenter.shared.dismiss()
+        PreviewController.shared.hide()
+        send?("com.apple.showdesktop.awake" as CFString, 0)
     }
 }

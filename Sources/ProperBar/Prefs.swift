@@ -174,6 +174,7 @@ final class Prefs: ObservableObject {
     @Published var showFavorites = load("showFavorites", true) { didSet { store("showFavorites", showFavorites) } }
     @Published var showTray = load("showTray", true) { didSet { store("showTray", showTray) } }
     @Published var showClock = load("showClock", true) { didSet { store("showClock", showClock) } }
+    @Published var showDesktopEdge = load("showDesktopEdge", true) { didSet { store("showDesktopEdge", showDesktopEdge) } }
     @Published var hideSystemDock = load("hideSystemDock", false) {
         didSet {
             store("hideSystemDock", hideSystemDock)

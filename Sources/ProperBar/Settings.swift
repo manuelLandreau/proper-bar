@@ -173,6 +173,7 @@ struct SettingsView: View {
                 Toggle("Favoris (déposez fichiers et dossiers sur le lanceur)", isOn: $prefs.showFavorites)
                 Toggle("Icônes système", isOn: $prefs.showTray)
                 Toggle("Date et heure", isOn: $prefs.showClock)
+                Toggle("Coin « Afficher le bureau » au bout de la barre", isOn: $prefs.showDesktopEdge)
             }
 
             Section("Apparence") {
