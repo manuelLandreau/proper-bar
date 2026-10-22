@@ -131,6 +131,8 @@ struct SettingsView: View {
             Section("Fenêtres") {
                 picker("Regroupement", $prefs.grouping, Grouping.allCases, \.label).disabled(prefs.mode == .dock)
                 picker("Ordre des apps", $prefs.order, AppOrder.allCases, \.label)
+                Toggle("Garder les fenêtres agrandies au-dessus de la barre", isOn: $prefs.keepWindowsClear)
+                    .disabled(prefs.autoHide)
                 Toggle("Aperçus au survol", isOn: $prefs.showPreviews)
                 Toggle("Badges de notification", isOn: $prefs.showBadges)
             }

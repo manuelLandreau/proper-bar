@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Demo.configure(Prefs.shared)
         }
         MenuTracking.install()
+        WindowFitter.shared.areas = { [weak self] in self?.bars.map(\.reservedArea) ?? [] }
         AppState.shared.start()
         reconcileBars()
         _ = SystemControls.shared

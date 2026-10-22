@@ -35,6 +35,7 @@ final class AppState: ObservableObject {
         tracker.onChange = { [weak self] apps in
             guard let self, self.apps != apps else { return }
             self.apps = apps
+            WindowFitter.shared.fit(apps)
         }
         tracker.start()
         timers.append(.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refreshBadges() })

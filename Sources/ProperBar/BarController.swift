@@ -60,6 +60,10 @@ final class BarController {
         panel.orderOut(nil)
     }
 
+    var reservedArea: WindowFitter.Area {
+        WindowFitter.Area(visible: screen.visibleFrame, bar: targetFrame(), position: Prefs.shared.position)
+    }
+
     private func targetFrame() -> CGRect {
         let prefs = Prefs.shared
         let full = screen.frame, visible = screen.visibleFrame

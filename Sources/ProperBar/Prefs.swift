@@ -113,6 +113,7 @@ final class Prefs: ObservableObject {
         didSet { store("launcherFollowsIconSize", launcherFollowsIconSize) }
     }
     @Published var autoHide = load("autoHide", false) { didSet { store("autoHide", autoHide) } }
+    @Published var keepWindowsClear = load("keepWindowsClear", true) { didSet { store("keepWindowsClear", keepWindowsClear) } }
     @Published var screenMode = load("screenMode", ScreenMode.perScreen) { didSet { store("screenMode", screenMode) } }
     @Published var singleScreenName = load("singleScreenName", "") { didSet { store("singleScreenName", singleScreenName) } }
     @Published var theme = load("theme", Theme.system) { didSet { store("theme", theme) } }

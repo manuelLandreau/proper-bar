@@ -21,7 +21,7 @@ final class WindowTracker {
     ]
     private static let windowNotifications = [
         kAXUIElementDestroyedNotification, kAXTitleChangedNotification, kAXWindowMiniaturizedNotification,
-        kAXWindowDeminiaturizedNotification, kAXWindowMovedNotification,
+        kAXWindowDeminiaturizedNotification, kAXWindowMovedNotification, kAXWindowResizedNotification,
     ]
 
     private let queue = DispatchQueue(label: "properbar.ax", qos: .userInitiated)
@@ -66,6 +66,19 @@ final class WindowTracker {
 
     func minimize(_ window: WindowItem) {
         withElement(window.id) { $0.set(kAXMinimizedAttribute, true) }
+    }
+
+    func setFrame(_ id: CGWindowID, _ frame: CGRect) {
+        let primaryHeight = NSScreen.screens.first?.frame.maxY ?? 0
+        withElement(id) { element in
+            var origin = CGPoint(x: frame.minX, y: primaryHeight - frame.maxY)
+            var size = frame.size
+            guard let position = AXValueCreate(.cgPoint, &origin), let extent = AXValueCreate(.cgSize, &size) else { return }
+            // Size, move, size again: macOS clamps a resize that would push the window off screen at its old position.
+            AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, extent)
+            AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, position)
+            AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, extent)
+        }
     }
 
     func close(_ window: WindowItem) {
