@@ -90,7 +90,7 @@ struct TilesView: View {
             let spacing = CGFloat(prefs.tileSpacing)
             let length = horizontal ? geo.size.width : geo.size.height
             let cross = horizontal ? geo.size.height : geo.size.width
-            let dockLength = min(cross, prefs.iconSide + CGFloat(prefs.tilePadding))
+            let dockLength = prefs.iconSide + CGFloat(prefs.tilePadding)
             let minLength = horizontal ? (taskbar ? 132 : dockLength) : (taskbar ? prefs.size.thickness - 8 : dockLength)
             let capacity = max(1, Int((length + spacing) / (minLength + spacing)))
             let tiles = makeTiles(apps: apps, pinned: prefs.pinned, grouping: taskbar ? prefs.grouping : .always,
