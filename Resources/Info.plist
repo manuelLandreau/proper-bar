@@ -10,6 +10,8 @@
 	<string>ProperBar</string>
 	<key>CFBundleExecutable</key>
 	<string>ProperBar</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>fr.manuellandreau.properbar</string>
 	<key>CFBundleName</key>

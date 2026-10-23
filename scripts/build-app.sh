@@ -39,9 +39,10 @@ swift build -c release
 
 APP="build/ProperBar.app"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/ProperBar "$APP/Contents/MacOS/ProperBar"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
 codesign --force --sign "$IDENTITY" --keychain "$KEYCHAIN" "$APP"
