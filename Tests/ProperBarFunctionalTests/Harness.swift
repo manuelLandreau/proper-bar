@@ -85,17 +85,42 @@ final class DemoApp {
     }
 
     /// Whether a real click at this point would land in one of our windows rather than another app's.
-    func owns(_ point: CGPoint) -> Bool {
-        var hit: AXUIElement?
-        var owner: pid_t = 0
-        return AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(point.x), Float(point.y), &hit) == .success
-            && hit.map { AXUIElementGetPid($0, &owner) } == .success && owner == pid
+    func owns(_ point: CGPoint) -> Bool { owner(at: point) == pid }
+
+    /// A point on the window's title bar that a real click would reach. Other apps' windows can sit over it (another
+    /// app under development, a maximised Finder), so the window is moved around the main screen until one is free.
+    func reachableTitleBar(of window: AXElement) async -> CGPoint? {
+        func free() -> CGPoint? {
+            let frame = window.frame
+            return stride(from: frame.minX + 80, to: frame.maxX - 80, by: 40).lazy
+                .map { CGPoint(x: $0, y: frame.minY + 12) }
+                .first { self.owns($0) }
+        }
+        if let point = free() { return point }
+        for y in stride(from: mainScreen.minY + 40, to: mainScreen.maxY - 200, by: 80) {
+            for x in stride(from: mainScreen.minX, to: mainScreen.maxX - 300, by: 120) {
+                var origin = CGPoint(x: x, y: y)
+                guard let value = AXValueCreate(.cgPoint, &origin) else { continue }
+                AXUIElementSetAttributeValue(window.ref, kAXPositionAttribute as CFString, value)
+                try? await Task.sleep(for: .milliseconds(50))
+                if let point = free() { return point }
+            }
+        }
+        return nil
     }
 
     var isFrontmost: Bool { root.value(kAXFrontmostAttribute) as? Bool == true }
 }
 
 let mainScreen = CGDisplayBounds(CGMainDisplayID())
+
+func owner(at point: CGPoint) -> pid_t? {
+    var hit: AXUIElement?
+    var owner: pid_t = 0
+    guard AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(point.x), Float(point.y), &hit) == .success,
+          let hit, AXUIElementGetPid(hit, &owner) == .success else { return nil }
+    return owner
+}
 
 func eventually(timeout: Duration = .seconds(5), _ condition: () -> Bool) async -> Bool {
     await waitFor(timeout: timeout) { condition() ? true : nil } ?? false

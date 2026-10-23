@@ -25,8 +25,7 @@ struct BarTests {
         try #require(await eventually { !app.isFrontmost })
         start.perform(kAXPressAction)
         try #require(await eventually { app.hasSearchField && app.isFrontmost })
-        let titleBar = CGPoint(x: settings.frame.midX, y: settings.frame.minY + 12)
-        try #require(app.owns(titleBar), "Settings is under another window")
+        let titleBar = try #require(await app.reachableTitleBar(of: settings), "other windows cover Settings wherever it goes")
 
         await click(at: titleBar)
 
