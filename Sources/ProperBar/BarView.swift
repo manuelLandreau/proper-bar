@@ -180,7 +180,7 @@ struct TileView: View {
         }
     }
 
-    private var fontSize: CGFloat { prefs.size == .small ? 11 : 12 }
+    private var fontSize: CGFloat { prefs.isCompact ? 11 : 12 }
 
     private var icon: some View {
         Image(nsImage: Icons.app(tile.bundleURL, pid: tile.pid))

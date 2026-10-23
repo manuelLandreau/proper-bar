@@ -10,7 +10,7 @@ struct ClockView: View {
                 Text(context.date.formatted(.dateTime.hour().minute()))
                     .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
-                if prefs.size != .small || !horizontal {
+                if !prefs.isCompact || !horizontal {
                     Text(context.date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)

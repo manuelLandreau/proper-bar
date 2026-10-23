@@ -22,34 +22,6 @@ extension BarPosition {
     }
 }
 
-enum BarSize: String, Codable, CaseIterable {
-    case small, medium, large, xlarge
-    var thickness: CGFloat {
-        switch self {
-        case .small: 34
-        case .medium: 42
-        case .large: 52
-        case .xlarge: 64
-        }
-    }
-    var icon: CGFloat {
-        switch self {
-        case .small: 18
-        case .medium: 22
-        case .large: 30
-        case .xlarge: 40
-        }
-    }
-    var label: String {
-        switch self {
-        case .small: "Petite"
-        case .medium: "Moyenne"
-        case .large: "Grande"
-        case .xlarge: "Très grande"
-        }
-    }
-}
-
 enum ScreenMode: String, Codable, CaseIterable {
     case perScreen, mirror, single
     var label: String {
@@ -148,7 +120,7 @@ final class Prefs: ObservableObject {
 
     @Published var mode = load("mode", BarMode.taskbar) { didSet { store("mode", mode) } }
     @Published var position = load("position", BarPosition.bottom) { didSet { store("position", position) } }
-    @Published var size = load("size", BarSize.medium) { didSet { store("size", size) } }
+    @Published var barHeight = load("barHeight", legacyBarHeight()) { didSet { store("barHeight", barHeight) } }
     @Published var grouping = load("grouping", Grouping.automatic) { didSet { store("grouping", grouping) } }
     @Published var order = load("order", AppOrder.manual) { didSet { store("order", order) } }
     @Published var iconSize = load("iconSize", 22.0) { didSet { store("iconSize", iconSize) } }
@@ -216,10 +188,12 @@ final class Prefs: ObservableObject {
     static let crossInset: CGFloat = 4
     static let minTaskbarTileWidth: CGFloat = 132
 
-    var tileCross: CGFloat { size.thickness - 2 * Self.crossInset }
+    var thickness: CGFloat { CGFloat(barHeight) }
+    var isCompact: Bool { barHeight < 38 }
+    var tileCross: CGFloat { thickness - 2 * Self.crossInset }
     var iconSide: CGFloat { min(CGFloat(iconSize), tileCross) }
     func squareSide(icon: CGFloat) -> CGFloat { min(tileCross, icon + CGFloat(tilePadding)) }
-    var launcherIconSide: CGFloat { launcherFollowsIconSize ? iconSide : size.icon }
+    var launcherIconSide: CGFloat { launcherFollowsIconSize ? iconSide : (tileCross * 0.65).rounded() }
 
     static let launcherSymbols: [(name: String, symbol: String)] = [
         ("Pomme", "apple.logo"),
@@ -233,8 +207,8 @@ final class Prefs: ObservableObject {
     ]
 
     var barThickness: CGFloat {
-        if position.isHorizontal { return size.thickness }
-        return mode == .taskbar ? 150 + size.thickness * 1.5 : size.thickness + 8
+        if position.isHorizontal { return thickness }
+        return mode == .taskbar ? 150 + thickness * 1.5 : thickness + 8
     }
 
     func togglePin(id: String, url: URL) {
@@ -256,6 +230,16 @@ private func load<T: Codable>(_ key: String, _ fallback: T) -> T {
     guard let data = defaults.data(forKey: key),
           let value = try? JSONDecoder().decode(T.self, from: data) else { return fallback }
     return value
+}
+
+// The height used to be one of four presets saved under "size".
+private func legacyBarHeight() -> Double {
+    switch load("size", "medium") {
+    case "small": 34
+    case "large": 52
+    case "xlarge": 64
+    default: 42
+    }
 }
 
 private func store<T: Codable>(_ key: String, _ value: T) {

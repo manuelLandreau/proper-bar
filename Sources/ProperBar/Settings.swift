@@ -99,7 +99,7 @@ struct SettingsView: View {
             Section("Barre") {
                 picker("Mode", $prefs.mode, BarMode.allCases, \.label)
                 picker("Position", $prefs.position, BarPosition.allCases, \.label)
-                picker("Hauteur de la barre", $prefs.size, BarSize.allCases, \.label)
+                slider("Hauteur de la barre", $prefs.barHeight, 28...80)
                 Toggle("Masquer automatiquement", isOn: $prefs.autoHide)
             }
 
