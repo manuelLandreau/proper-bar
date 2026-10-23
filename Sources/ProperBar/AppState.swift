@@ -23,7 +23,6 @@ final class AppState: ObservableObject {
     let tracker = WindowTracker()
     private let sampler = ActivitySampler()
     private let background = DispatchQueue(label: "properbar.background", qos: .utility)
-    private var timers: [Timer] = []
     private var lastSample = Date.distantPast
 
     func start() {
@@ -38,9 +37,9 @@ final class AppState: ObservableObject {
             WindowFitter.shared.fit(apps)
         }
         tracker.start()
-        timers.append(.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refreshBadges() })
+        Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refreshBadges() }.tolerance = 0.5
         // Polling the modifier state needs no Input Monitoring permission, unlike a global key monitor.
-        timers.append(.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in self?.pollControlKey() })
+        Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in self?.pollControlKey() }.tolerance = 0.05
         refreshBadges()
     }
 

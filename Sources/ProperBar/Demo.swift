@@ -5,6 +5,8 @@ import ProperBarCore
 enum Demo {
     private static let arguments = ProcessInfo.processInfo.arguments
     static let isOn = arguments.contains("--demo")
+    // For the functional tests: another app to click into focus, whose one small window covers nothing they look at.
+    static let isIdle = arguments.contains("--demo-idle")
     static let suite = "fr.manuellandreau.properbar.demo"
 
     static func value(_ flag: String) -> String? {
@@ -50,17 +52,26 @@ enum Demo {
         prefs.manualOrder = prefs.pinned.map(\.id)
         prefs.favorites = ["/Applications", NSHomeDirectory() + "/Documents"]
         if let mode = value("--demo-mode").flatMap(BarMode.init(rawValue:)) { prefs.mode = mode }
-        if let style = value("--demo-style"), let match = TileStyle.allCases.first(where: { "\($0)" == style }) {
-            prefs.tileStyle = match
-        }
+        if let style = value("--demo-style").flatMap(TileStyle.init(rawValue:)) { prefs.tileStyle = style }
     }
 
     private static var backdrop: NSWindow?
+    private static var idleWindow: NSWindow?
+
+    static func startIdle() {
+        NSApp.setActivationPolicy(.regular)
+        guard let screen = NSScreen.screens.first else { return }
+        let window = NSWindow(contentRect: CGRect(x: screen.visibleFrame.minX, y: screen.visibleFrame.maxY - 80, width: 120, height: 80),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.title = "idle"
+        window.orderFrontRegardless()
+        idleWindow = window
+    }
 
     static func start() {
-        guard isOn, let screen = NSScreen.screens.first else { return }
+        guard let screen = NSScreen.screens.first else { return }
         let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
-        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)) - 1)
+        window.level = NSWindow.Level(rawValue: NSWindow.Level.bar.rawValue - 1)
         window.ignoresMouseEvents = true
         window.collectionBehavior = [.canJoinAllSpaces, .stationary]
         let gradient = NSGradient(colors: [

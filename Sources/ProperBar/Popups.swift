@@ -11,6 +11,7 @@ final class PanelPresenter {
 
     private(set) var current: String?
     private var panel: PopupPanel?
+    private var anchor = CGRect.zero
     private var monitors: [Any] = []
     private var previousApp: NSRunningApplication?
 
@@ -27,16 +28,9 @@ final class PanelPresenter {
 
         let host = NSHostingView(rootView: content())
         let size = host.fittingSize
-        let panel = PopupPanel(contentRect: CGRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel],
-                               backing: .buffered, defer: false)
-        panel.acceptsKey = key
-        panel.level = .aboveBar
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]
-        panel.appearance = Prefs.shared.theme.appearance
+        let panel = Chrome.floatingPanel(PopupPanel.self, behavior: [.moveToActiveSpace, .ignoresCycle])
         panel.contentView = Chrome.wrap(host, cornerRadius: 16)
+        panel.acceptsKey = key
 
         let target = popupFrame(size: size, anchor: anchor)
         panel.setFrame(target.offsetBy(dx: slide.dx, dy: slide.dy), display: false)
@@ -55,15 +49,21 @@ final class PanelPresenter {
             panel.animator().setFrame(target, display: true)
         }
         self.panel = panel
+        self.anchor = anchor
         current = id
 
         if let global = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
             self?.dismiss()
         }) { monitors.append(global) }
-        // Clicks on the bar are left alone: its buttons toggle popups themselves. A click in another ProperBar window
-        // (Settings) must keep ProperBar active, or re-activating the previous app would bury the window just clicked.
+        // A click on the popup's own bar button is left to that button, which toggles. A click in another ProperBar
+        // window (Settings) must keep ProperBar active, or re-activating the previous app would bury the window just clicked.
         if let local = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] event in
-            if let self, let window = event.window, window !== self.panel, !(window is BarPanel) { self.dismiss(restoreFocus: false) }
+            guard let self, let window = event.window, window !== self.panel else { return event }
+            if !(window is BarPanel) {
+                self.dismiss(restoreFocus: false)
+            } else if !self.anchor.contains(NSEvent.mouseLocation) {
+                self.dismiss()
+            }
             return event
         }) { monitors.append(local) }
     }
@@ -77,10 +77,7 @@ final class PanelPresenter {
         let previous = previousApp
         previousApp = nil
         if animated {
-            NSAnimationContext.runAnimationGroup({ ctx in
-                ctx.duration = 0.12
-                panel.animator().alphaValue = 0
-            }, completionHandler: { panel.orderOut(nil) })
+            panel.fade(to: 0, duration: 0.12) { panel.orderOut(nil) }
         } else {
             panel.orderOut(nil)
         }

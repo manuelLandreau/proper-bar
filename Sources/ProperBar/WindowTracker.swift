@@ -4,17 +4,6 @@ import ProperBarCore
 final class WindowTracker {
     var onChange: (([AppItem]) -> Void)?
 
-    private struct AppInfo {
-        let pid: pid_t
-        let id: String
-        let url: URL?
-        let name: String
-        let launchDate: Date?
-        let isActive: Bool
-        let isHidden: Bool
-        let isLaunching: Bool
-    }
-
     private static let appNotifications = [
         kAXWindowCreatedNotification, kAXFocusedWindowChangedNotification, kAXMainWindowChangedNotification,
         kAXApplicationHiddenNotification, kAXApplicationShownNotification,
@@ -31,7 +20,6 @@ final class WindowTracker {
     private var elements: [CGWindowID: AXUIElement] = [:]
     private var refreshPending = false
     private var trusted = AXIsProcessTrusted()
-    private var timer: Timer?
 
     func start() {
         let center = NSWorkspace.shared.notificationCenter
@@ -44,14 +32,14 @@ final class WindowTracker {
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.scheduleRefresh() }
         }
         // AX notifications miss some changes (apps that never post them, windows moved across Spaces).
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.scheduleRefresh() }
+        Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.scheduleRefresh() }.tolerance = 0.5
         scheduleRefresh()
     }
 
-    func scheduleRefresh() {
+    func scheduleRefresh(after delay: TimeInterval = 0.03) {
         guard !refreshPending else { return }
         refreshPending = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self] in self?.refresh() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.refresh() }
     }
 
     func focus(_ window: WindowItem) {
@@ -69,10 +57,10 @@ final class WindowTracker {
     }
 
     func setFrame(_ id: CGWindowID, _ frame: CGRect) {
-        let primaryHeight = NSScreen.screens.first?.frame.maxY ?? 0
+        let flipped = frame.flippedY(primaryHeight: primaryHeight)
         withElement(id) { element in
-            var origin = CGPoint(x: frame.minX, y: primaryHeight - frame.maxY)
-            var size = frame.size
+            var origin = flipped.origin
+            var size = flipped.size
             guard let position = AXValueCreate(.cgPoint, &origin), let extent = AXValueCreate(.cgSize, &size) else { return }
             // Size, move, size again: macOS clamps a resize that would push the window off screen at its old position.
             AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, extent)
@@ -107,15 +95,15 @@ final class WindowTracker {
         observers.keys.filter { !live.contains($0) }.forEach(unobserve)
         if trusted { running.forEach(observe) }
 
-        let infos = running.map {
-            AppInfo(pid: $0.processIdentifier, id: $0.bundleIdentifier ?? "pid:\($0.processIdentifier)", url: $0.bundleURL,
+        let apps = running.map {
+            AppItem(id: $0.bundleIdentifier ?? "pid:\($0.processIdentifier)", pid: $0.processIdentifier, bundleURL: $0.bundleURL,
                     name: $0.localizedName ?? "?", launchDate: $0.launchDate, isActive: $0.isActive,
                     isHidden: $0.isHidden, isLaunching: !$0.isFinishedLaunching)
         }
-        let primaryHeight = NSScreen.screens.first?.frame.maxY ?? 0
+        let primaryHeight = primaryHeight
         queue.async { [weak self] in
             guard let self else { return }
-            let (apps, found) = self.snapshot(infos, primaryHeight: primaryHeight)
+            let (apps, found) = self.snapshot(apps, primaryHeight: primaryHeight)
             DispatchQueue.main.async {
                 self.watch(found)
                 self.onChange?(apps)
@@ -123,11 +111,12 @@ final class WindowTracker {
         }
     }
 
-    private func snapshot(_ infos: [AppInfo], primaryHeight: CGFloat) -> ([AppItem], [(CGWindowID, pid_t, AXUIElement)]) {
+    private func snapshot(_ apps: [AppItem], primaryHeight: CGFloat) -> ([AppItem], [(CGWindowID, pid_t, AXUIElement)]) {
         var elements: [CGWindowID: AXUIElement] = [:]
         var found: [(CGWindowID, pid_t, AXUIElement)] = []
-        let apps = infos.map { info -> AppItem in
-            let appElement = AXUIElementCreateApplication(info.pid)
+        let apps = apps.map { app -> AppItem in
+            var app = app
+            let appElement = AXUIElementCreateApplication(app.pid)
             // A hung app would otherwise block the whole refresh for the default 6 s.
             AXUIElementSetMessagingTimeout(appElement, 0.25)
             let focused = appElement.element(kAXFocusedWindowAttribute)?.windowID
@@ -137,15 +126,15 @@ final class WindowTracker {
                 let origin = window.point(kAXPositionAttribute) ?? .zero
                 let size = window.size(kAXSizeAttribute) ?? .zero
                 elements[id] = window
-                found.append((id, info.pid, window))
+                found.append((id, app.pid, window))
                 windows.append(WindowItem(
-                    id: id, pid: info.pid, title: window.string(kAXTitleAttribute) ?? "",
+                    id: id, pid: app.pid, title: window.string(kAXTitleAttribute) ?? "",
                     isMinimized: window.bool(kAXMinimizedAttribute) ?? false, isFocused: id == focused,
-                    frame: CGRect(x: origin.x, y: primaryHeight - origin.y - size.height, width: size.width, height: size.height)
+                    frame: CGRect(origin: origin, size: size).flippedY(primaryHeight: primaryHeight)
                 ))
             }
-            return AppItem(id: info.id, pid: info.pid, bundleURL: info.url, name: info.name, launchDate: info.launchDate,
-                           isActive: info.isActive, isHidden: info.isHidden, isLaunching: info.isLaunching, windows: windows)
+            app.windows = windows
+            return app
         }
         self.elements = elements
         return (apps, found)
@@ -155,9 +144,11 @@ final class WindowTracker {
         let pid = app.processIdentifier
         guard observers[pid] == nil else { return }
         var created: AXObserver?
-        let callback: AXObserverCallback = { _, _, _, refcon in
+        let callback: AXObserverCallback = { _, _, notification, refcon in
             guard let refcon else { return }
-            Unmanaged<WindowTracker>.fromOpaque(refcon).takeUnretainedValue().scheduleRefresh()
+            // A drag or a live resize posts these continuously: a full refresh per event would rebuild every bar ~30×/s.
+            let continuous = [kAXWindowMovedNotification, kAXWindowResizedNotification].contains(notification as String)
+            Unmanaged<WindowTracker>.fromOpaque(refcon).takeUnretainedValue().scheduleRefresh(after: continuous ? 0.25 : 0.03)
         }
         guard AXObserverCreate(pid, callback, &created) == .success, let observer = created else { return }
         let element = AXUIElementCreateApplication(pid)
@@ -175,6 +166,8 @@ final class WindowTracker {
         guard let observer = observers.removeValue(forKey: pid) else { return }
         CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
     }
+
+    private var primaryHeight: CGFloat { NSScreen.screens.first?.frame.maxY ?? 0 }
 
     private func watch(_ found: [(CGWindowID, pid_t, AXUIElement)]) {
         let refcon = Unmanaged.passUnretained(self).toOpaque()

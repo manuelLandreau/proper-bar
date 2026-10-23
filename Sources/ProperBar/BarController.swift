@@ -8,7 +8,12 @@ final class BarPanel: NSPanel {
 
 final class BarContext: ObservableObject {
     weak var panel: NSPanel?
-    var isPrimary = false
+    let isPrimary: Bool
+
+    init(panel: NSPanel, isPrimary: Bool) {
+        self.panel = panel
+        self.isPrimary = isPrimary
+    }
 
     func screenRect(_ global: CGRect) -> CGRect {
         guard let frame = panel?.frame else { return .zero }
@@ -19,7 +24,6 @@ final class BarContext: ObservableObject {
 final class BarController {
     let screen: NSScreen
     private let panel: BarPanel
-    private let context = BarContext()
     private var shown = true
     private var lastInside = Date()
     private var timer: Timer?
@@ -33,26 +37,28 @@ final class BarController {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.hidesOnDeactivate = false
-        context.panel = panel
-        context.isPrimary = screen == NSScreen.screens.first
 
-        let root = BarView(screenID: screen.displayID, isPrimary: screen == NSScreen.screens.first, showsAllWindows: showsAllWindows)
-            .environmentObject(context)
+        let root = BarView(screenID: screen.displayID, showsAllWindows: showsAllWindows)
+            .environmentObject(BarContext(panel: panel, isPrimary: screen == NSScreen.screens.first))
         let host = NSHostingView(rootView: root)
         host.sizingOptions = []
         panel.contentView = Chrome.wrap(host, cornerRadius: 0)
         layout()
         panel.orderFrontRegardless()
-
-        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in self?.tick() }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
     }
 
     func layout() {
-        panel.appearance = Prefs.shared.theme.appearance
         panel.setFrame(targetFrame(), display: true)
-        if !Prefs.shared.autoHide { setShown(true) }
+        guard Prefs.shared.autoHide else {
+            timer?.invalidate()
+            timer = nil
+            setShown(true)
+            return
+        }
+        guard timer == nil else { return }
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in self?.tick() }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
 
     func close() {
@@ -61,7 +67,7 @@ final class BarController {
     }
 
     var reservedArea: WindowFitter.Area {
-        WindowFitter.Area(visible: screen.visibleFrame, bar: targetFrame(), position: Prefs.shared.position)
+        WindowFitter.Area(visible: screen.visibleFrame, bar: targetFrame())
     }
 
     private func targetFrame() -> CGRect {
@@ -77,7 +83,6 @@ final class BarController {
     }
 
     private func tick() {
-        guard Prefs.shared.autoHide else { return }
         let mouse = NSEvent.mouseLocation
         let inside = panel.frame.insetBy(dx: -4, dy: -4).contains(mouse)
             || PreviewController.shared.isVisible || PanelPresenter.shared.isVisible || MenuTracking.isOpen
@@ -104,10 +109,6 @@ final class BarController {
         guard value != shown else { return }
         shown = value
         panel.ignoresMouseEvents = !value
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.18
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().alphaValue = value ? 1 : 0
-        }
+        panel.fade(to: value ? 1 : 0, duration: 0.18)
     }
 }

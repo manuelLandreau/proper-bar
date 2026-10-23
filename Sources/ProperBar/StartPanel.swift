@@ -1,4 +1,5 @@
 import AppKit
+import ProperBarCore
 import SwiftUI
 
 struct CatalogApp: Identifiable, Hashable {
@@ -20,8 +21,7 @@ enum AppCatalog {
             let urls = (try? fm.contentsOfDirectory(at: URL(fileURLWithPath: dir), includingPropertiesForKeys: nil,
                                                     options: [.skipsHiddenFiles])) ?? []
             for url in urls where url.pathExtension == "app" {
-                var name = fm.displayName(atPath: url.path)
-                if name.hasSuffix(".app") { name = String(name.dropLast(4)) }
+                let name = appDisplayName(atPath: url.path)
                 if seen.insert(name).inserted { apps.append(CatalogApp(url: url, name: name)) }
             }
         }
@@ -65,11 +65,18 @@ struct StartView: View {
     private var results: [CatalogApp] {
         guard !query.isEmpty else { return apps }
         let matches = apps.filter { $0.name.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
-        let prefix = matches.filter { $0.name.range(of: query, options: [.caseInsensitive, .diacriticInsensitive, .anchored]) != nil }
-        return prefix + matches.filter { !prefix.contains($0) }
+        let (prefix, rest) = matches.reduce(into: ([CatalogApp](), [CatalogApp]())) { split, app in
+            if app.name.range(of: query, options: [.caseInsensitive, .diacriticInsensitive, .anchored]) != nil {
+                split.0.append(app)
+            } else {
+                split.1.append(app)
+            }
+        }
+        return prefix + rest
     }
 
     var body: some View {
+        let results = results
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -149,9 +156,7 @@ struct StartView: View {
 
     private func launch(_ app: CatalogApp) {
         PanelPresenter.shared.dismiss(restoreFocus: false)
-        let config = NSWorkspace.OpenConfiguration()
-        config.activates = true
-        NSWorkspace.shared.openApplication(at: app.url, configuration: config)
+        NSWorkspace.shared.openApplication(at: app.url, configuration: .init())
     }
 
     private func addFolder() {
@@ -162,8 +167,7 @@ struct StartView: View {
         panel.allowsMultipleSelection = true
         NSApp.activate()
         guard panel.runModal() == .OK else { return }
-        let prefs = Prefs.shared
-        prefs.startFolders += panel.urls.map(\.path).filter { !prefs.startFolders.contains($0) }
+        Prefs.shared.startFolders.appendUnique(contentsOf: panel.urls.map(\.path))
     }
 }
 
@@ -226,14 +230,17 @@ private struct PowerButton: View {
     let action: () -> Void
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 13, weight: .medium))
-            .frame(width: 30, height: 30)
-            .hoverHighlight(radius: 15)
-            .onTapGesture {
-                PanelPresenter.shared.dismiss(restoreFocus: false)
-                action()
-            }
-            .help(label)
+        Button {
+            PanelPresenter.shared.dismiss(restoreFocus: false)
+            action()
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .medium))
+                .frame(width: 30, height: 30)
+                .hoverHighlight(radius: 15)
+        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
     }
 }

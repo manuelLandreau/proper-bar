@@ -8,9 +8,14 @@ private func app(_ id: String, pid: pid_t, launched: TimeInterval, windows: [CGW
             windows: windows.map { WindowItem(id: $0, pid: pid, title: "\(id)-\($0)", isFocused: $0 == focused) })
 }
 
+private func make(_ apps: [AppItem], pinned: [PinnedApp] = [], grouping: Grouping = .never, order: AppOrder = .launch,
+                  manual: [String] = [], capacity: Int = 100) -> [Tile] {
+    makeTiles(apps: apps, pinned: pinned, grouping: grouping, order: order, manualOrder: manual, capacity: capacity)
+}
+
 private func tiles(_ apps: [AppItem], pinned: [PinnedApp] = [], grouping: Grouping = .never, order: AppOrder = .launch,
                    manual: [String] = [], capacity: Int = 100) -> [String] {
-    makeTiles(apps: apps, pinned: pinned, grouping: grouping, order: order, manualOrder: manual, capacity: capacity).map(\.id)
+    make(apps, pinned: pinned, grouping: grouping, order: order, manual: manual, capacity: capacity).map(\.id)
 }
 
 @Test func neverGroupingGivesOneTilePerWindowAndOneForWindowlessApps() {
@@ -20,7 +25,7 @@ private func tiles(_ apps: [AppItem], pinned: [PinnedApp] = [], grouping: Groupi
 
 @Test func alwaysGroupingGivesOneTilePerApp() {
     let apps = [app("safari", pid: 1, launched: 1, windows: [10, 12]), app("music", pid: 2, launched: 2)]
-    let result = makeTiles(apps: apps, pinned: [], grouping: .always, order: .launch, manualOrder: [], capacity: 100)
+    let result = make(apps, grouping: .always)
     #expect(result.map(\.id) == ["a:safari", "a:music"])
     #expect(result[0].windows.map(\.id) == [10, 12])
 }
@@ -44,8 +49,7 @@ private func tiles(_ apps: [AppItem], pinned: [PinnedApp] = [], grouping: Groupi
 }
 
 @Test func pinnedAppThatIsNotRunningHasNoPid() {
-    let result = makeTiles(apps: [], pinned: [PinnedApp(id: "x", path: "/Applications/Xcode.app")],
-                           grouping: .never, order: .launch, manualOrder: [], capacity: 10)
+    let result = make([], pinned: [PinnedApp(id: "x", path: "/Applications/Xcode.app")])
     #expect(result.count == 1)
     #expect(result[0].isRunning == false)
     #expect(result[0].isPinned)
@@ -65,7 +69,7 @@ private func tiles(_ apps: [AppItem], pinned: [PinnedApp] = [], grouping: Groupi
 
 @Test func activeFlagFollowsFocusedWindowOfActiveApp() {
     let apps = [app("a", pid: 1, launched: 1, windows: [1, 2], active: true, focused: 2)]
-    let result = makeTiles(apps: apps, pinned: [], grouping: .never, order: .launch, manualOrder: [], capacity: 10)
+    let result = make(apps)
     #expect(result.map(\.isActive) == [false, true])
 }
 

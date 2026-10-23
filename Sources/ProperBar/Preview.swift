@@ -6,6 +6,9 @@ import SwiftUI
 final class PreviewController: ObservableObject {
     static let shared = PreviewController()
     static let card = CGSize(width: 224, height: 160)
+    static let columns = 4
+    static let gap: CGFloat = 8
+    static let inset: CGFloat = 10
 
     @Published private(set) var windowIDs: [CGWindowID] = []
     @Published private(set) var images: [CGWindowID: NSImage] = [:]
@@ -17,16 +20,14 @@ final class PreviewController: ObservableObject {
     private var overPanel = false
     private var timer: Timer?
     private var generation = 0
+    private var capturing: [CGWindowID]?
+    private(set) var appURL: URL?
+    private(set) var appName = ""
 
     var isVisible: Bool { panel.isVisible && panel.alphaValue > 0 }
 
     init() {
-        panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        panel.level = .aboveBar
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        panel = Chrome.floatingPanel(NSPanel.self, behavior: [.canJoinAllSpaces, .stationary, .ignoresCycle], defer: true)
         let host = NSHostingView(rootView: PreviewView(preview: self))
         host.sizingOptions = []
         panel.contentView = Chrome.wrap(host, cornerRadius: 16)
@@ -34,11 +35,7 @@ final class PreviewController: ObservableObject {
 
     func hover(_ tile: Tile, rect: CGRect, inside: Bool) {
         overTile = inside
-        guard inside else {
-            scheduleHide()
-            return
-        }
-        guard Prefs.shared.showPreviews, !tile.windows.isEmpty, !PanelPresenter.shared.isVisible else {
+        guard inside, Prefs.shared.showPreviews, !tile.windows.isEmpty, !PanelPresenter.shared.isVisible else {
             scheduleHide()
             return
         }
@@ -56,18 +53,15 @@ final class PreviewController: ObservableObject {
         generation += 1
         let ids = tile.windows.map(\.id)
         if ids != windowIDs { images = images.filter { ids.contains($0.key) } }
+        appURL = tile.bundleURL
+        appName = tile.name
         windowIDs = ids
         anchor = rect
         relayout(count: ids.count)
-        panel.appearance = Prefs.shared.theme.appearance
         if !isVisible {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.15
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                panel.animator().alphaValue = 1
-            }
+            panel.fade(to: 1, duration: 0.15)
         }
         capture()
         timer?.invalidate()
@@ -79,23 +73,20 @@ final class PreviewController: ObservableObject {
         timer?.invalidate()
         guard panel.isVisible else { return }
         let generation = generation
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.12
-            panel.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
+        panel.fade(to: 0, duration: 0.12) { [weak self] in
             guard let self, self.generation == generation else { return }
             self.panel.orderOut(nil)
             self.windowIDs = []
             self.images = [:]
-        })
+        }
     }
 
     func relayout(count: Int) {
         guard count > 0 else { return }
-        let columns = min(count, 4)
-        let rows = (count + 3) / 4
-        let size = CGSize(width: CGFloat(columns) * Self.card.width + CGFloat(columns - 1) * 8 + 20,
-                          height: CGFloat(rows) * Self.card.height + CGFloat(rows - 1) * 8 + 20)
+        let columns = min(count, Self.columns)
+        let rows = (count + Self.columns - 1) / Self.columns
+        let size = CGSize(width: CGFloat(columns) * Self.card.width + CGFloat(columns - 1) * Self.gap + 2 * Self.inset,
+                          height: CGFloat(rows) * Self.card.height + CGFloat(rows - 1) * Self.gap + 2 * Self.inset)
         panel.setFrame(popupFrame(size: size, anchor: anchor), display: true, animate: false)
     }
 
@@ -115,12 +106,16 @@ final class PreviewController: ObservableObject {
 
     private func capture() {
         let ids = windowIDs
-        guard Permissions.screenRecording, !ids.isEmpty else { return }
+        // A slow capture would otherwise pile up behind the 1 s timer; another tile's windows still get theirs at once.
+        guard Permissions.screenRecording, !ids.isEmpty, capturing != ids else { return }
+        capturing = ids
         let maxSize = CGSize(width: Self.card.width * 2, height: (Self.card.height - 34) * 2)
         Task { [weak self] in
             let images = await WindowCapture.images(for: ids, maxSize: maxSize)
             await MainActor.run {
-                guard let self, self.windowIDs == ids else { return }
+                guard let self else { return }
+                if self.capturing == ids { self.capturing = nil }
+                guard self.windowIDs == ids else { return }
                 self.images.merge(images) { _, new in new }
             }
         }
@@ -154,11 +149,12 @@ struct PreviewView: View {
     var body: some View {
         let all = Dictionary(state.apps.flatMap(\.windows).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let windows = preview.windowIDs.compactMap { all[$0] }
-        let columns = Array(repeating: GridItem(.fixed(PreviewController.card.width), spacing: 8), count: max(1, min(windows.count, 4)))
-        LazyVGrid(columns: columns, spacing: 8) {
+        let columns = Array(repeating: GridItem(.fixed(PreviewController.card.width), spacing: PreviewController.gap),
+                            count: max(1, min(windows.count, PreviewController.columns)))
+        LazyVGrid(columns: columns, spacing: PreviewController.gap) {
             ForEach(windows) { PreviewCard(window: $0) }
         }
-        .padding(10)
+        .padding(PreviewController.inset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .animation(Motion.layout, value: windows.map(\.id))
         .onHover { PreviewController.shared.panelHover($0) }
@@ -174,11 +170,11 @@ struct PreviewCard: View {
     @State private var hovering = false
 
     var body: some View {
-        let icon = Icons.app(NSRunningApplication(processIdentifier: window.pid)?.bundleURL, pid: window.pid)
+        let icon = Icons.app(preview.appURL, pid: window.pid)
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(nsImage: icon).resizable().frame(width: 16, height: 16)
-                Text(window.title.isEmpty ? (NSRunningApplication(processIdentifier: window.pid)?.localizedName ?? "") : window.title)
+                Text(window.title.isEmpty ? preview.appName : window.title)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
                 Spacer(minLength: 0)

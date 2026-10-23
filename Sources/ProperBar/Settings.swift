@@ -82,7 +82,6 @@ struct SettingsView: View {
     @State private var accessibility = Permissions.accessibility
     @State private var screenRecording = Permissions.screenRecording
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
-    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Form {
@@ -105,14 +104,12 @@ struct SettingsView: View {
             }
 
             Section("Tuiles") {
-                Picker("Style", selection: Binding(get: { prefs.tileStyle }, set: { prefs.tileStyle = $0 })) {
-                    ForEach(TileStyle.allCases, id: \.self) { Text($0.label).tag($0) }
-                }
+                picker("Style", $prefs.tileStyle, TileStyle.allCases, \.label)
                 slider("Taille des icônes", $prefs.iconSize, 14...48)
                 slider("Marge autour des icônes", $prefs.tilePadding, 0...20)
                 slider("Espacement entre les tuiles", $prefs.tileSpacing, 0...16)
                 if prefs.mode == .taskbar {
-                    slider("Largeur maximale des tuiles", $prefs.maxTileWidth, 132...360)
+                    slider("Largeur maximale des tuiles", $prefs.maxTileWidth, Double(Prefs.minTaskbarTileWidth)...360)
                 }
                 Toggle("Surligner au survol", isOn: $prefs.hoverHighlight)
                 Toggle("Agrandir l'icône au survol", isOn: $prefs.hoverZoom)
@@ -163,9 +160,7 @@ struct SettingsView: View {
             Section("Écrans") {
                 picker("Affichage", $prefs.screenMode, ScreenMode.allCases, \.label)
                 if prefs.screenMode == .single {
-                    Picker("Écran", selection: $prefs.singleScreenName) {
-                        ForEach(NSScreen.screens.map(\.localizedName), id: \.self) { Text($0).tag($0) }
-                    }
+                    picker("Écran", $prefs.singleScreenName, NSScreen.screens.map(\.localizedName), \.self)
                 }
             }
 
@@ -198,7 +193,8 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 480, height: 680)
-        .onReceive(ticker) { _ in
+        // Permissions are granted in System Settings, so coming back to ProperBar is when they can have changed.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             accessibility = Permissions.accessibility
             screenRecording = Permissions.screenRecording
         }
@@ -222,7 +218,7 @@ struct SettingsView: View {
                         unit: String = "pt", scale: Double = 1, step: Double = 1) -> some View {
         LabeledContent(title) {
             HStack {
-                Slider(value: value, in: range, step: step).frame(width: 160)
+                Slider(value: value, in: range, step: step).frame(width: 160).accessibilityLabel(title)
                 Text("\(Int((value.wrappedValue * scale).rounded())) \(unit)")
                     .monospacedDigit().foregroundStyle(.secondary).frame(width: 44, alignment: .trailing)
             }

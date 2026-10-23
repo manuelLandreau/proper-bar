@@ -5,25 +5,24 @@ import UniformTypeIdentifiers
 struct BarView: View {
     @ObservedObject private var state = AppState.shared
     @ObservedObject private var prefs = Prefs.shared
+    @EnvironmentObject private var bar: BarContext
     let screenID: CGDirectDisplayID
-    let isPrimary: Bool
     let showsAllWindows: Bool
 
     var body: some View {
         let horizontal = prefs.position.isHorizontal
-        let spacing = CGFloat(prefs.tileSpacing)
-        let stack = horizontal ? AnyLayout(HStackLayout(spacing: spacing)) : AnyLayout(VStackLayout(spacing: spacing))
-        let edge = horizontal ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+        let edge = prefs.position.stack(spacing: 0)
+        let items = prefs.position.stack(spacing: CGFloat(prefs.tileSpacing))
         edge {
-            stack {
+            items {
                 StartButton()
                 if prefs.showFavorites && !prefs.favorites.isEmpty { FavoritesView() }
                 TilesView(apps: visibleApps)
                 if prefs.showTray { TrayView() }
                 if prefs.showClock { ClockView() }
             }
-            .padding(.horizontal, horizontal ? 6 : 4)
-            .padding(.vertical, horizontal ? 4 : 6)
+            .padding(horizontal ? .vertical : .horizontal, Prefs.crossInset)
+            .padding(horizontal ? .horizontal : .vertical, 6)
             if prefs.showDesktopEdge { ShowDesktopEdge() }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -37,7 +36,7 @@ struct BarView: View {
             screens.max { $0.1.intersection(window.frame).area < $1.1.intersection(window.frame).area }?.0 == screenID
         }
         return state.apps.compactMap { app in
-            guard !app.windows.isEmpty else { return isPrimary || pinned.contains(app.id) ? app : nil }
+            guard !app.windows.isEmpty else { return bar.isPrimary || pinned.contains(app.id) ? app : nil }
             var local = app
             local.windows = app.windows.filter(isHere)
             return local.windows.isEmpty && !pinned.contains(app.id) ? nil : local
@@ -47,11 +46,8 @@ struct BarView: View {
 
 struct StartButton: View {
     @ObservedObject private var prefs = Prefs.shared
-    @EnvironmentObject private var bar: BarContext
-    @State private var frame = CGRect.zero
 
     var body: some View {
-        let side = min(prefs.size.thickness - 8, prefs.launcherIconSide + CGFloat(prefs.tilePadding))
         let icon = prefs.launcherIconSide
         Group {
             if let image = Icons.image(prefs.launcherImagePath) {
@@ -62,24 +58,14 @@ struct StartButton: View {
                     .foregroundStyle(Color.accentColor.gradient)
             }
         }
-        .frame(width: side, height: prefs.size.thickness - 8)
-        .hoverHighlight(radius: CGFloat(prefs.tileRadius), enabled: prefs.hoverHighlight)
-        .globalFrame($frame)
-        .onTapGesture(perform: open)
-        .onReceive(NotificationCenter.default.publisher(for: .demoPanel)) { note in
-            if bar.isPrimary, note.object as? String == "start" { open() }
-        }
+        .frame(width: prefs.squareSide(icon: icon), height: prefs.tileCross)
+        .barPopup("start", key: true) { StartView() }
+        .accessibilityIdentifier("start-button")
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            loadFileURLs(providers) { urls in
-                prefs.favorites += urls.map(\.path).filter { !prefs.favorites.contains($0) }
-            }
+            loadFileURLs(providers) { prefs.favorites.appendUnique(contentsOf: $0.map(\.path)) }
             return true
         }
         .help("Applications — déposez un fichier ou un dossier ici pour l'ajouter aux favoris")
-    }
-
-    private func open() {
-        PanelPresenter.shared.toggle("start", anchor: bar.screenRect(frame), key: true) { StartView() }
     }
 }
 
@@ -95,14 +81,14 @@ struct TilesView: View {
             let length = horizontal ? geo.size.width : geo.size.height
             let cross = horizontal ? geo.size.height : geo.size.width
             let dockLength = prefs.iconSide + CGFloat(prefs.tilePadding)
-            let minLength = horizontal ? (taskbar ? 132 : dockLength) : (taskbar ? prefs.size.thickness - 8 : dockLength)
+            let minLength = !taskbar ? dockLength : horizontal ? Prefs.minTaskbarTileWidth : prefs.tileCross
             let capacity = max(1, Int((length + spacing) / (minLength + spacing)))
             let tiles = makeTiles(apps: apps, pinned: prefs.pinned, grouping: taskbar ? prefs.grouping : .always,
                                   order: prefs.order, manualOrder: prefs.manualOrder, capacity: capacity)
             let fitted = horizontal && taskbar
                 ? min(max(CGFloat(prefs.maxTileWidth), minLength), max(minLength, (length + spacing) / CGFloat(max(tiles.count, 1)) - spacing))
                 : minLength
-            let stack = horizontal ? AnyLayout(HStackLayout(spacing: spacing)) : AnyLayout(VStackLayout(spacing: spacing))
+            let stack = prefs.position.stack(spacing: spacing)
             ScrollView(horizontal ? .horizontal : .vertical) {
                 stack {
                     ForEach(tiles) { tile in
@@ -156,6 +142,8 @@ struct TileView: View {
             .onDrag { NSItemProvider(object: (TileActions.dragPrefix + tile.appID) as NSString) }
             .onDrop(of: [.fileURL, .utf8PlainText], isTargeted: $dropping) { TileActions.drop($0, on: tile, siblings: siblings) }
             .help(tile.windows.isEmpty || !prefs.showPreviews ? tile.title : "")
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("tile")
     }
 
     @ViewBuilder private var content: some View {
@@ -332,7 +320,6 @@ enum TileActions {
     static let dragPrefix = "properbar-tile:"
 
     static func click(_ tile: Tile, rect: CGRect) {
-        PanelPresenter.shared.dismiss()
         if tile.windows.count > 1 {
             PreviewController.shared.show(tile, rect: rect)
             return
@@ -356,9 +343,7 @@ enum TileActions {
 
     static func open(_ tile: Tile) {
         if let url = tile.bundleURL {
-            let config = NSWorkspace.OpenConfiguration()
-            config.activates = true
-            NSWorkspace.shared.openApplication(at: url, configuration: config)
+            NSWorkspace.shared.openApplication(at: url, configuration: .init())
         } else if let pid = tile.pid {
             NSRunningApplication(processIdentifier: pid)?.activate()
         }
@@ -396,18 +381,20 @@ enum TileActions {
 // Sits outside the bar padding so it reaches the screen corner, like the Windows "show desktop" sliver.
 struct ShowDesktopEdge: View {
     @ObservedObject private var prefs = Prefs.shared
-    @State private var hovering = false
 
     var body: some View {
         let horizontal = prefs.position.isHorizontal
-        Rectangle()
-            .fill(Color.primary.opacity(hovering ? 0.12 : 0))
+        // A tap gesture, not a Button: the bar panel never becomes key, like the tiles that also use onTapGesture.
+        Color.clear
             .frame(width: horizontal ? 8 : nil, height: horizontal ? nil : 8)
-            .contentShape(Rectangle())
-            .animation(Motion.hover, value: hovering)
-            .onHover { hovering = $0 }
-            .onTapGesture { Desktop.toggle() }
+            .hoverHighlight(radius: 0)
+            .onTapGesture(perform: Desktop.toggle)
             .help("Afficher le bureau")
+            .accessibilityElement()
+            .accessibilityLabel("Afficher le bureau")
+            .accessibilityIdentifier("show-desktop")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { Desktop.toggle() }
     }
 }
 
@@ -420,7 +407,6 @@ enum Desktop {
     }()
 
     static func toggle() {
-        PanelPresenter.shared.dismiss()
         PreviewController.shared.hide()
         send?("com.apple.showdesktop.awake" as CFString, 0)
     }

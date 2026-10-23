@@ -7,15 +7,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var prefsObserver: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if Demo.isIdle {
+            Demo.startIdle()
+            return
+        }
         if Demo.isOn {
             UserDefaults.standard.removePersistentDomain(forName: Demo.suite)
             Demo.configure(Prefs.shared)
         }
+        NSApp.appearance = Prefs.shared.theme.appearance
         MenuTracking.install()
         WindowFitter.shared.areas = { [weak self] in self?.bars.map(\.reservedArea) ?? [] }
         AppState.shared.start()
         reconcileBars()
         _ = SystemControls.shared
+        prefsObserver = Prefs.shared.objectWillChange
+            .debounce(for: .milliseconds(30), scheduler: RunLoop.main)
+            .sink { [weak self] in self?.reconcileBars() }
         guard !Demo.isOn else {
             Demo.start()
             return
@@ -23,9 +31,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             self?.reconcileBars(force: true)
         }
-        prefsObserver = Prefs.shared.objectWillChange
-            .debounce(for: .milliseconds(30), scheduler: RunLoop.main)
-            .sink { [weak self] in self?.reconcileBars() }
         DockHider.apply(Prefs.shared.hideSystemDock)
         if !Permissions.accessibility {
             Permissions.requestAccessibility()

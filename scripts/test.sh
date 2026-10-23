@@ -1,11 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/env.sh
 
-# Same Command Line Tools gaps as build-app.sh, plus swift-testing's macro plugin living outside the default search path.
-if [[ "$(xcode-select -p)" == /Library/Developer/CommandLineTools* ]]; then
-    CLT=/Library/Developer/CommandLineTools
-    [ -z "${SDKROOT:-}" ] && [ -d "$CLT/SDKs/MacOSX26.sdk" ] && export SDKROOT="$CLT/SDKs/MacOSX26.sdk"
+# swift-testing's macro plugin lives outside the default search path under the Command Line Tools.
+if [ "$USING_CLT" = 1 ]; then
     exec swift test -Xswiftc -plugin-path -Xswiftc "$CLT/usr/lib/swift/host/plugins/testing" "$@"
 fi
 exec swift test "$@"

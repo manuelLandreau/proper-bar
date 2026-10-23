@@ -1,9 +1,12 @@
 import CoreGraphics
 
-public enum ScreenEdge: Sendable { case bottom, top, left, right }
+public enum BarPosition: String, Codable, CaseIterable, Sendable {
+    case bottom, top, left, right
+    public var isHorizontal: Bool { self == .bottom || self == .top }
+}
 
 /// Only a window snapped to the screen edge under the bar is moved; one the user dragged there by hand is left alone.
-public func fittedFrame(_ frame: CGRect, visible: CGRect, bar: CGRect, edge: ScreenEdge) -> CGRect? {
+public func fittedFrame(_ frame: CGRect, visible: CGRect, bar: CGRect, edge: BarPosition) -> CGRect? {
     let tolerance: CGFloat = 4
     guard frame.intersects(bar) else { return nil }
     var target = frame

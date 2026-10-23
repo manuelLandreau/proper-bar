@@ -3,12 +3,10 @@ import SwiftUI
 struct TrayView: View {
     @ObservedObject private var sys = SystemControls.shared
     @ObservedObject private var prefs = Prefs.shared
-    @EnvironmentObject private var bar: BarContext
-    @State private var frame = CGRect.zero
 
     var body: some View {
         let horizontal = prefs.position.isHorizontal
-        let stack = horizontal ? AnyLayout(HStackLayout(spacing: 11)) : AnyLayout(VStackLayout(spacing: 10))
+        let stack = prefs.position.stack(spacing: horizontal ? 11 : 10)
         stack {
             if !sys.ejectable.isEmpty { Image(systemName: "eject.fill") }
             Image(systemName: sys.wifiOn ? "wifi" : "wifi.slash")
@@ -24,16 +22,7 @@ struct TrayView: View {
         .padding(.horizontal, horizontal ? 10 : 0)
         .padding(.vertical, horizontal ? 0 : 10)
         .frame(maxWidth: horizontal ? nil : .infinity, maxHeight: horizontal ? .infinity : nil)
-        .hoverHighlight(radius: CGFloat(prefs.tileRadius), enabled: prefs.hoverHighlight)
-        .globalFrame($frame)
-        .onTapGesture(perform: open)
-        .onReceive(NotificationCenter.default.publisher(for: .demoPanel)) { note in
-            if bar.isPrimary, note.object as? String == "control" { open() }
-        }
-    }
-
-    private func open() {
-        PanelPresenter.shared.toggle("control", anchor: bar.screenRect(frame)) { ControlCenterView() }
+        .barPopup("control") { ControlCenterView() }
     }
 }
 

@@ -1,14 +1,17 @@
 import AppKit
 import ProperBarCore
+import SwiftUI
 
 enum BarMode: String, Codable, CaseIterable {
     case taskbar, dock
     var label: String { self == .taskbar ? "Barre des tâches" : "Dock" }
 }
 
-enum BarPosition: String, Codable, CaseIterable {
-    case bottom, top, left, right
-    var isHorizontal: Bool { self == .bottom || self == .top }
+extension BarPosition {
+    func stack(spacing: CGFloat) -> AnyLayout {
+        isHorizontal ? AnyLayout(HStackLayout(spacing: spacing)) : AnyLayout(VStackLayout(spacing: spacing))
+    }
+
     var label: String {
         switch self {
         case .bottom: "En bas"
@@ -98,7 +101,7 @@ struct TileLook: Equatable {
     var hoverHighlight: Bool
 }
 
-enum TileStyle: CaseIterable {
+enum TileStyle: String, CaseIterable {
     case macOS, plasma, dots, custom
 
     var label: String {
@@ -168,7 +171,12 @@ final class Prefs: ObservableObject {
     @Published var keepWindowsClear = load("keepWindowsClear", true) { didSet { store("keepWindowsClear", keepWindowsClear) } }
     @Published var screenMode = load("screenMode", ScreenMode.perScreen) { didSet { store("screenMode", screenMode) } }
     @Published var singleScreenName = load("singleScreenName", "") { didSet { store("singleScreenName", singleScreenName) } }
-    @Published var theme = load("theme", Theme.system) { didSet { store("theme", theme) } }
+    @Published var theme = load("theme", Theme.system) {
+        didSet {
+            store("theme", theme)
+            NSApp.appearance = theme.appearance
+        }
+    }
     @Published var showPreviews = load("showPreviews", true) { didSet { store("showPreviews", showPreviews) } }
     @Published var showBadges = load("showBadges", true) { didSet { store("showBadges", showBadges) } }
     @Published var showFavorites = load("showFavorites", true) { didSet { store("showFavorites", showFavorites) } }
@@ -205,7 +213,12 @@ final class Prefs: ObservableObject {
                  radius: tileRadius, hoverZoom: hoverZoom, hoverHighlight: hoverHighlight)
     }
 
-    var iconSide: CGFloat { min(CGFloat(iconSize), size.thickness - 8) }
+    static let crossInset: CGFloat = 4
+    static let minTaskbarTileWidth: CGFloat = 132
+
+    var tileCross: CGFloat { size.thickness - 2 * Self.crossInset }
+    var iconSide: CGFloat { min(CGFloat(iconSize), tileCross) }
+    func squareSide(icon: CGFloat) -> CGFloat { min(tileCross, icon + CGFloat(tilePadding)) }
     var launcherIconSide: CGFloat { launcherFollowsIconSize ? iconSide : size.icon }
 
     static let launcherSymbols: [(name: String, symbol: String)] = [

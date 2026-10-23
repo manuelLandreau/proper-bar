@@ -5,8 +5,7 @@ struct FavoritesView: View {
     @State private var targeted = false
 
     var body: some View {
-        let spacing = CGFloat(prefs.tileSpacing)
-        let stack = prefs.position.isHorizontal ? AnyLayout(HStackLayout(spacing: spacing)) : AnyLayout(VStackLayout(spacing: spacing))
+        let stack = prefs.position.stack(spacing: CGFloat(prefs.tileSpacing))
         stack {
             ForEach(prefs.favorites, id: \.self) { FavoriteItem(path: $0) }
         }
@@ -15,9 +14,7 @@ struct FavoritesView: View {
         .animation(Motion.state, value: targeted)
         .animation(Motion.layout, value: prefs.favorites)
         .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
-            loadFileURLs(providers) { urls in
-                prefs.favorites += urls.map(\.path).filter { !prefs.favorites.contains($0) }
-            }
+            loadFileURLs(providers) { prefs.favorites.appendUnique(contentsOf: $0.map(\.path)) }
             return true
         }
     }
@@ -28,7 +25,7 @@ struct FavoriteItem: View {
     @ObservedObject private var prefs = Prefs.shared
 
     var body: some View {
-        let side = min(prefs.size.thickness - 8, prefs.iconSide + CGFloat(prefs.tilePadding))
+        let side = prefs.squareSide(icon: prefs.iconSide)
         Image(nsImage: Icons.file(path))
             .resizable()
             .interpolation(.high)

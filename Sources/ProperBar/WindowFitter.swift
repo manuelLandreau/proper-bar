@@ -7,7 +7,6 @@ final class WindowFitter {
     struct Area {
         let visible: CGRect
         let bar: CGRect
-        let position: BarPosition
     }
 
     static let shared = WindowFitter()
@@ -19,11 +18,12 @@ final class WindowFitter {
         let prefs = Prefs.shared
         guard prefs.keepWindowsClear, !prefs.autoHide else { return }
         let areas = areas()
+        let edge = prefs.position
         var live = Set<CGWindowID>()
         for window in apps.flatMap(\.windows) where !window.isMinimized {
             live.insert(window.id)
             let target = areas.lazy
-                .compactMap { fittedFrame(window.frame, visible: $0.visible, bar: $0.bar, edge: $0.position.edge) }
+                .compactMap { fittedFrame(window.frame, visible: $0.visible, bar: $0.bar, edge: edge) }
                 .first
             guard let target else {
                 attempts[window.id] = nil
@@ -35,16 +35,5 @@ final class WindowFitter {
             AppState.shared.tracker.setFrame(window.id, target)
         }
         attempts = attempts.filter { live.contains($0.key) }
-    }
-}
-
-extension BarPosition {
-    var edge: ScreenEdge {
-        switch self {
-        case .bottom: .bottom
-        case .top: .top
-        case .left: .left
-        case .right: .right
-        }
     }
 }

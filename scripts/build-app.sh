@@ -33,11 +33,7 @@ EOF
     rm -rf "$work"
 fi
 
-# The Command Line Tools ship the macOS 27 SDK, whose @State is a macro, without the SwiftUIMacros plugin that expands it.
-CLT_SDK26=/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk
-if [ -z "${SDKROOT:-}" ] && [ -d "$CLT_SDK26" ] && [[ "$(xcode-select -p)" == /Library/Developer/CommandLineTools* ]]; then
-    export SDKROOT="$CLT_SDK26"
-fi
+source scripts/env.sh
 
 swift build -c release
 

@@ -12,6 +12,7 @@ let package = Package(
             linkerSettings: [.linkedFramework("CoreWLAN"), .linkedFramework("ScreenCaptureKit")]
         ),
         .testTarget(name: "ProperBarCoreTests", dependencies: ["ProperBarCore"]),
+        .testTarget(name: "ProperBarFunctionalTests"),
     ],
     swiftLanguageModes: [.v5]
 )

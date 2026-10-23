@@ -2,8 +2,6 @@ import SwiftUI
 
 struct ClockView: View {
     @ObservedObject private var prefs = Prefs.shared
-    @EnvironmentObject private var bar: BarContext
-    @State private var frame = CGRect.zero
 
     var body: some View {
         let horizontal = prefs.position.isHorizontal
@@ -22,16 +20,7 @@ struct ClockView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .frame(maxWidth: horizontal ? nil : .infinity, maxHeight: horizontal ? .infinity : nil)
-        .hoverHighlight(radius: CGFloat(prefs.tileRadius), enabled: prefs.hoverHighlight)
-        .globalFrame($frame)
-        .onTapGesture(perform: open)
-        .onReceive(NotificationCenter.default.publisher(for: .demoPanel)) { note in
-            if bar.isPrimary, note.object as? String == "calendar" { open() }
-        }
-    }
-
-    private func open() {
-        PanelPresenter.shared.toggle("calendar", anchor: bar.screenRect(frame)) { CalendarView() }
+        .barPopup("calendar") { CalendarView() }
     }
 }
 

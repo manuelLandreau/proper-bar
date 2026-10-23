@@ -54,10 +54,12 @@ public struct PinnedApp: Codable, Equatable, Sendable {
         self.path = path
     }
 
-    public var name: String {
-        let name = FileManager.default.displayName(atPath: path)
-        return name.hasSuffix(".app") ? String(name.dropLast(4)) : name
-    }
+    public var name: String { appDisplayName(atPath: path) }
+}
+
+public func appDisplayName(atPath path: String) -> String {
+    let name = FileManager.default.displayName(atPath: path)
+    return name.hasSuffix(".app") ? String(name.dropLast(4)) : name
 }
 
 public enum Grouping: String, CaseIterable, Codable, Sendable { case automatic, always, never }
@@ -88,19 +90,26 @@ public struct Tile: Identifiable, Equatable, Sendable {
 
 private struct Entry {
     let id: String
-    var app: AppItem?
+    let app: AppItem?
     let pinned: PinnedApp?
     let pinIndex: Int?
+    let name: String
+    let windows: [WindowItem]
 
-    var name: String { app?.name ?? pinned?.name ?? id }
-    // AX returns windows in z-order, which reshuffles on every focus change; window ids grow with creation.
-    var windows: [WindowItem] { (app?.windows ?? []).sorted { $0.id < $1.id } }
+    init(id: String, app: AppItem?, pinned: PinnedApp?, pinIndex: Int?) {
+        self.id = id
+        self.app = app
+        self.pinned = pinned
+        self.pinIndex = pinIndex
+        name = app?.name ?? pinned?.name ?? id
+        // AX returns windows in z-order, which reshuffles on every focus change; window ids grow with creation.
+        windows = (app?.windows ?? []).sorted { $0.id < $1.id }
+    }
 
     func grouped() -> [Tile] { [tile(.app, windows: windows, tileID: "a:\(id)")] }
 
     func ungrouped() -> [Tile] {
-        let windows = windows
-        return windows.isEmpty ? grouped() : windows.map { tile(.window, windows: [$0], tileID: "w:\($0.id)") }
+        windows.isEmpty ? grouped() : windows.map { tile(.window, windows: [$0], tileID: "w:\($0.id)") }
     }
 
     private func tile(_ kind: Tile.Kind, windows: [WindowItem], tileID: String) -> Tile {
@@ -124,7 +133,7 @@ public func makeTiles(apps: [AppItem], pinned: [PinnedApp], grouping: Grouping, 
             if var merged = entries[i].app {
                 merged.windows += app.windows
                 merged.isActive = merged.isActive || app.isActive
-                entries[i].app = merged
+                entries[i] = Entry(id: app.id, app: merged, pinned: entries[i].pinned, pinIndex: entries[i].pinIndex)
             }
             continue
         }
