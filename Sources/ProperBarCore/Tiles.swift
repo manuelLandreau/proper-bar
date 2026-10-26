@@ -86,6 +86,18 @@ public struct Tile: Identifiable, Equatable, Sendable {
         if kind == .window, let title = windows.first?.title, !title.isEmpty { return title }
         return name
     }
+
+    public var recentWindow: WindowItem? {
+        windows.first { $0.isFocused } ?? windows.first { !$0.isMinimized } ?? windows.first
+    }
+
+    // Steps through the model order, not the z-order: raising a window reshuffles the z-order under the cycle.
+    public func window(cycling step: Int, from current: CGWindowID?) -> WindowItem? {
+        let shown = windows.filter { !$0.isMinimized }
+        let ring = shown.isEmpty ? windows : shown
+        guard let start = current ?? recentWindow?.id, let i = ring.firstIndex(where: { $0.id == start }) else { return ring.first }
+        return ring[((i + step) % ring.count + ring.count) % ring.count]
+    }
 }
 
 private struct Entry {

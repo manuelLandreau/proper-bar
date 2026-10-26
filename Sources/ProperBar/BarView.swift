@@ -320,21 +320,32 @@ enum TileActions {
     static let dragPrefix = "properbar-tile:"
 
     static func click(_ tile: Tile, rect: CGRect) {
-        if tile.windows.count > 1 {
+        let grouped = tile.windows.count > 1
+        let mode = Prefs.shared.groupClick
+        if grouped && mode == .windows {
             PreviewController.shared.show(tile, rect: rect)
             return
         }
         PreviewController.shared.hide()
-        if let window = tile.windows.first {
-            toggle(window, in: tile)
+        if grouped {
+            // A Dock click is a reopen: the app comes forward and restores a window if all are minimized.
+            mode == .plasma ? cycle(tile) : open(tile)
+        } else if let window = tile.windows.first {
+            toggle(window, active: tile.isActive, hidden: tile.isHidden)
         } else {
             open(tile)
         }
     }
 
-    static func toggle(_ window: WindowItem, in tile: Tile) {
+    static func cycle(_ tile: Tile) {
+        let focused = tile.windows.first { $0.isFocused && !$0.isMinimized }
+        let next = tile.isActive && !tile.isHidden ? tile.window(cycling: 1, from: focused?.id) : tile.recentWindow
+        if let next { AppState.shared.tracker.focus(next) }
+    }
+
+    static func toggle(_ window: WindowItem, active: Bool, hidden: Bool) {
         let tracker = AppState.shared.tracker
-        if tile.isActive && window.isFocused && !window.isMinimized && !tile.isHidden && tracker.isInPlace(window) {
+        if active && window.isFocused && !window.isMinimized && !hidden && tracker.isInPlace(window) {
             tracker.minimize(window)
         } else {
             tracker.focus(window)

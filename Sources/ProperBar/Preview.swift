@@ -207,8 +207,13 @@ struct PreviewCard: View {
         .animation(Motion.hover, value: hovering)
         .animation(Motion.state, value: preview.images[window.id] != nil)
         .onTapGesture {
-            AppState.shared.tracker.focus(window)
             PreviewController.shared.hide()
+            let app = NSRunningApplication(processIdentifier: window.pid)
+            if Prefs.shared.groupClick == .windows, let app {
+                TileActions.toggle(window, active: app.isActive, hidden: app.isHidden)
+            } else {
+                AppState.shared.tracker.focus(window)
+            }
         }
     }
 }

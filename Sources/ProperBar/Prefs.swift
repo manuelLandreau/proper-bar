@@ -105,6 +105,17 @@ extension Grouping {
     }
 }
 
+enum GroupClick: String, Codable, CaseIterable {
+    case windows, macOS, plasma
+    var label: String {
+        switch self {
+        case .windows: "Windows : aperçus, la fenêtre active s'y réduit"
+        case .macOS: "macOS : l'app passe devant"
+        case .plasma: "KDE Plasma : une fenêtre après l'autre"
+        }
+    }
+}
+
 extension AppOrder {
     var label: String {
         switch self {
@@ -123,6 +134,7 @@ final class Prefs: ObservableObject {
     @Published var barHeight = load("barHeight", legacyBarHeight()) { didSet { store("barHeight", barHeight) } }
     @Published var grouping = load("grouping", Grouping.automatic) { didSet { store("grouping", grouping) } }
     @Published var order = load("order", AppOrder.manual) { didSet { store("order", order) } }
+    @Published var groupClick = load("groupClick", GroupClick.plasma) { didSet { store("groupClick", groupClick) } }
     @Published var iconSize = load("iconSize", 22.0) { didSet { store("iconSize", iconSize) } }
     @Published var tilePadding = load("tilePadding", 8.0) { didSet { store("tilePadding", tilePadding) } }
     @Published var tileSpacing = load("tileSpacing", 2.0) { didSet { store("tileSpacing", tileSpacing) } }

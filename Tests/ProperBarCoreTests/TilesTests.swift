@@ -91,3 +91,13 @@ private func tiles(_ apps: [AppItem], pinned: [PinnedApp] = [], grouping: Groupi
     #expect(reordered(["a", "b"], moving: "a", onto: "a") == ["a", "b"])
     #expect(reordered(["a", "b"], moving: "z", onto: "a") == ["a", "b"])
 }
+
+@Test func cyclingSkipsMinimizedWindowsAndWrapsAround() {
+    var apps = [app("a", pid: 1, launched: 1, windows: [1, 2, 3, 4], focused: 3)]
+    apps[0].windows[1].isMinimized = true
+    let group = make(apps, grouping: .always)[0]
+    #expect(group.recentWindow?.id == 3)
+    #expect(group.window(cycling: 1, from: nil)?.id == 4)
+    #expect(group.window(cycling: 1, from: 4)?.id == 1)
+    #expect(group.window(cycling: -1, from: 1)?.id == 4)
+}

@@ -150,6 +150,7 @@ struct SettingsView: View {
 
             Section("Fenêtres") {
                 picker("Regroupement", $prefs.grouping, Grouping.allCases, \.label).disabled(prefs.mode == .dock)
+                picker("Clic sur une app groupée", $prefs.groupClick, GroupClick.allCases, \.label)
                 picker("Ordre des apps", $prefs.order, AppOrder.allCases, \.label)
                 Toggle("Garder les fenêtres agrandies au-dessus de la barre", isOn: $prefs.keepWindowsClear)
                     .disabled(prefs.autoHide)
