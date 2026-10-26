@@ -43,18 +43,16 @@ final class WindowTracker {
     }
 
     func focus(_ window: WindowItem) {
-        if let app = NSRunningApplication(processIdentifier: window.pid), app.isHidden { app.unhide() }
-        withElement(window.id) { [queue] element in
-            let bringToFront = {
-                AXUIElementCreateApplication(window.pid).set(kAXFrontmostAttribute, true)
-                element.perform(kAXRaiseAction)
-                element.set(kAXMainAttribute, true)
-            }
-            guard element.bool(kAXMinimizedAttribute) == true else { return bringToFront() }
-            element.set(kAXMinimizedAttribute, false)
-            bringToFront()
-            // JetBrains IDEs drop an activation requested while the window is still deminiaturizing (150 ms is not enough).
-            queue.asyncAfter(deadline: .now() + 0.4, execute: bringToFront)
+        let app = NSRunningApplication(processIdentifier: window.pid)
+        if let app, app.isHidden { app.unhide() }
+        // Reopen is how the Dock restores: JetBrains IDEs drop an AX activation requested while the window deminiaturizes.
+        let reopen = window.isMinimized ? app?.bundleURL : nil
+        if let reopen { NSWorkspace.shared.openApplication(at: reopen, configuration: .init()) }
+        withElement(window.id) { element in
+            if element.bool(kAXMinimizedAttribute) == true { element.set(kAXMinimizedAttribute, false) }
+            if reopen == nil { AXUIElementCreateApplication(window.pid).set(kAXFrontmostAttribute, true) }
+            element.perform(kAXRaiseAction)
+            element.set(kAXMainAttribute, true)
         }
     }
 
