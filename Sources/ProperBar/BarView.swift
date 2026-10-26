@@ -334,7 +334,7 @@ enum TileActions {
 
     static func toggle(_ window: WindowItem, in tile: Tile) {
         let tracker = AppState.shared.tracker
-        if tile.isActive && window.isFocused && !window.isMinimized && !tile.isHidden {
+        if tile.isActive && window.isFocused && !window.isMinimized && !tile.isHidden && tracker.isInPlace(window) {
             tracker.minimize(window)
         } else {
             tracker.focus(window)

@@ -52,6 +52,15 @@ final class WindowTracker {
         }
     }
 
+    // Show Desktop slides windows aside in the window server only: AX still reports them in place, focused and unminimized.
+    func isInPlace(_ window: WindowItem) -> Bool {
+        guard let info = (CGWindowListCopyWindowInfo(.optionIncludingWindow, window.id) as? [[String: Any]])?.first,
+              let bounds = info[kCGWindowBounds as String] as! CFDictionary?,
+              let frame = CGRect(dictionaryRepresentation: bounds) else { return true }
+        let shown = frame.flippedY(primaryHeight: primaryHeight)
+        return abs(shown.minX - window.frame.minX) < 1 && abs(shown.minY - window.frame.minY) < 1
+    }
+
     func minimize(_ window: WindowItem) {
         withElement(window.id) { $0.set(kAXMinimizedAttribute, true) }
     }
