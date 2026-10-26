@@ -6,6 +6,23 @@ final class BarPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+// The bar's app is never active, so AppKit never resets the cursor over it: a resize cursor picked up on the edge of
+// a window above the bar would stick.
+private final class ArrowCursor: NSResponder {
+    // Private WindowServer switch: NSCursor.set() from an app that is not frontmost is ignored without it.
+    static let allowInBackground: Void = {
+        typealias Connection = @convention(c) () -> Int32
+        typealias SetProperty = @convention(c) (Int32, Int32, CFString, CFTypeRef) -> Int32
+        let handle = dlopen("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", RTLD_LAZY)
+        guard let main = dlsym(handle, "_CGSDefaultConnection"), let set = dlsym(handle, "CGSSetConnectionProperty") else { return }
+        let connection = unsafeBitCast(main, to: Connection.self)()
+        _ = unsafeBitCast(set, to: SetProperty.self)(connection, connection, "SetsCursorInBackground" as CFString, kCFBooleanTrue)
+    }()
+
+    override func mouseEntered(with event: NSEvent) { NSCursor.arrow.set() }
+    override func mouseMoved(with event: NSEvent) { NSCursor.arrow.set() }
+}
+
 final class BarContext: ObservableObject {
     weak var panel: NSPanel?
     let isPrimary: Bool
@@ -24,6 +41,10 @@ final class BarContext: ObservableObject {
 final class BarController {
     let screen: NSScreen
     private let panel: BarPanel
+    private let cursor: ArrowCursor = {
+        ArrowCursor.allowInBackground
+        return ArrowCursor()
+    }()
     private var shown = true
     private var lastInside = Date()
     private var timer: Timer?
@@ -42,6 +63,8 @@ final class BarController {
             .environmentObject(BarContext(panel: panel, isPrimary: screen == NSScreen.screens.first))
         let host = NSHostingView(rootView: root)
         host.sizingOptions = []
+        host.addTrackingArea(NSTrackingArea(rect: .zero, options: [.activeAlways, .inVisibleRect, .mouseEnteredAndExited, .mouseMoved],
+                                            owner: cursor))
         panel.contentView = Chrome.wrap(host, cornerRadius: 0)
         layout()
         panel.orderFrontRegardless()
