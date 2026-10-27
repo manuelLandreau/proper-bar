@@ -18,6 +18,8 @@ final class WindowTracker {
     private var observers: [pid_t: AXObserver] = [:]
     private var observedWindows: Set<CGWindowID> = []
     private var elements: [CGWindowID: AXUIElement] = [:]
+    private var windowsByPID: [pid_t: [WindowItem]] = [:]
+    private var stalledUntil: [pid_t: Date] = [:]
     private var refreshPending = false
     private var trusted = AXIsProcessTrusted()
 
@@ -127,14 +129,33 @@ final class WindowTracker {
     private func snapshot(_ apps: [AppItem], primaryHeight: CGFloat) -> ([AppItem], [(CGWindowID, pid_t, AXUIElement)]) {
         var elements: [CGWindowID: AXUIElement] = [:]
         var found: [(CGWindowID, pid_t, AXUIElement)] = []
+        var windowsByPID: [pid_t: [WindowItem]] = [:]
+        var stalledUntil: [pid_t: Date] = [:]
+        let now = Date()
         let apps = apps.map { app -> AppItem in
             var app = app
+            defer { windowsByPID[app.pid] = app.windows }
             let appElement = AXUIElementCreateApplication(app.pid)
             // A hung app would otherwise block the whole refresh for the default 6 s.
             AXUIElementSetMessagingTimeout(appElement, 0.25)
+            // An app whose AX server is wedged (seen with a PhpStorm up for days) times out on every call: retrying it
+            // each refresh holds the AX queue ~0.5 s, and every click action waits in that queue behind it.
+            let skipUntil = self.stalledUntil[app.pid].flatMap { $0 > now ? $0 : nil }
+            var axWindows: CFTypeRef?
+            if skipUntil != nil
+                || AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &axWindows) == .cannotComplete {
+                stalledUntil[app.pid] = skipUntil ?? now + 10
+                app.windows = self.windowsByPID[app.pid] ?? []
+                for window in app.windows {
+                    guard let element = self.elements[window.id] else { continue }
+                    elements[window.id] = element
+                    found.append((window.id, app.pid, element))
+                }
+                return app
+            }
             let focused = appElement.element(kAXFocusedWindowAttribute)?.windowID
             var windows: [WindowItem] = []
-            for window in appElement.elements(kAXWindowsAttribute) {
+            for window in axWindows as? [AXUIElement] ?? [] {
                 guard window.string(kAXSubroleAttribute) == kAXStandardWindowSubrole, let id = window.windowID else { continue }
                 let origin = window.point(kAXPositionAttribute) ?? .zero
                 let size = window.size(kAXSizeAttribute) ?? .zero
@@ -150,6 +171,8 @@ final class WindowTracker {
             return app
         }
         self.elements = elements
+        self.windowsByPID = windowsByPID
+        self.stalledUntil = stalledUntil
         return (apps, found)
     }
 
